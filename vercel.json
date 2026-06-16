@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "name": "panel-app",
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "*.json",     "use": "@vercel/static" },
+    { "src": "sw.js",      "use": "@vercel/static" },
+    { "src": "icon-*.png", "use": "@vercel/static" }
+  ],
+  "routes": [
+    {
+      "src": "/sw.js",
+      "headers": {
+        "Service-Worker-Allowed": "/",
+        "Cache-Control": "no-cache"
+      },
+      "dest": "/sw.js"
+    },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options",         "value": "DENY" },
+        { "key": "Referrer-Policy",          "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "선실생산부 판넬 신청/입고 현황",
+  "short_name": "판넬현황",
+  "description": "HD현대중공업 선실생산부 판넬 신청 및 입고 현황 관리",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#002554",
+  "theme_color": "#002554",
+  "orientation": "portrait-primary",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    { "name": "신청", "url": "/?tab=apply", "description": "판넬 신청" },
+    { "name": "집계표", "url": "/?tab=summary", "description": "주간 집계표 보기" }
+  ]
+}
