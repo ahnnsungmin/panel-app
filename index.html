@@ -355,6 +355,12 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
 /* Connection bar */
 .conn-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 18px;font-size:13px;font-weight:600;text-align:center;z-index:900;background:var(--bst);color:var(--tst);border-top:1px solid var(--cst)}
 .conn-bar.err{background:var(--bap);color:var(--tap);border-top-color:var(--cap)}
+
+/* Summary gate */
+#sumGate{max-width:420px}
+#sumGate select optgroup{color:var(--mu);font-size:12px}
+#sumGate select option{color:var(--ink);font-size:14px}
+.sum-who-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;background:#fff;border:1px solid var(--ln);border-radius:13px;box-shadow:var(--sh);margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -461,29 +467,74 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
 <section class="view" id="view-summary">
   <div class="ph"><div class="ey">Summary</div><h2 id="sumTtl">주간 신청 집계표</h2>
   <p>요일별 건수를 누르면 상세·입고완료 처리 화면으로 이동합니다. 등 색은 가장 단계가 낮은 건 기준입니다.</p></div>
-  <div class="exp-open-bar">
-    <button class="btn bp" id="openExp" style="gap:8px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      데이터 내보내기
-    </button>
-  </div>
-  <div class="card" id="sumCard">
-    <div class="legend">
-      <span><i class="dot" style="background:var(--cap)"></i>신청(미접수)</span>
-      <span><i class="dot" style="background:var(--crc)"></i>접수완료</span>
-      <span><i class="dot" style="background:var(--csh)"></i>배송완료</span>
-      <span><i class="dot" style="background:var(--cst)"></i>입고완료</span>
+
+  <!-- ── 로그인 게이트 ── -->
+  <div class="card gate" id="sumGate">
+    <div class="ct"><span class="tg">LOGIN</span>집계표 접속</div>
+    <div class="field">
+      <label class="req">소속</label>
+      <select class="ctrl" id="sumRole">
+        <option value="">소속 선택</option>
+        <optgroup label="── 소속팀">
+          <option value="team:선실1팀">선실1팀</option>
+          <option value="team:창민기업">창민기업</option>
+          <option value="team:해인이엔지">해인이엔지</option>
+        </optgroup>
+        <optgroup label="── 업체">
+          <option value="vendor:대진SAT">대진SAT</option>
+          <option value="vendor:비아이피">비아이피</option>
+          <option value="vendor:성미">성미</option>
+          <option value="vendor:세진기술산업">세진기술산업</option>
+        </optgroup>
+        <optgroup label="── 담당과">
+          <option value="dept:선실1과">선실1과</option>
+          <option value="dept:선실2과">선실2과</option>
+        </optgroup>
+        <optgroup label="── 관리자">
+          <option value="admin:관리자">관리자</option>
+        </optgroup>
+      </select>
     </div>
-    <div class="fbar">
-      <div class="field"><label>호선 필터</label>
-        <select class="ctrl" id="fHull"><option value="">전체 호선</option></select></div>
-      <div class="field"><label>담당과 필터</label>
-        <select class="ctrl" id="fDept"><option value="">전체</option>
-          <option value="선실1과">선실1과</option><option value="선실2과">선실2과</option></select></div>
+    <div class="field">
+      <label class="req">비밀번호</label>
+      <input type="password" class="ctrl" id="sumPw" placeholder="비밀번호" autocomplete="off">
     </div>
-    <div id="sumBody"></div>
+    <button class="btn bp bblk blg" id="sumLogin">집계표 접속</button>
   </div>
-  <div id="sumDetail" style="display:none"></div>
+
+  <!-- ── 로그인 후 보드 ── -->
+  <div id="sumBoard" style="display:none">
+    <div class="sum-who-bar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="chip" id="sumWho"></span>
+        <span style="font-size:13px;color:var(--mu)" id="sumRoleLbl"></span>
+      </div>
+      <button class="btn bg" id="sumLogout">로그아웃</button>
+    </div>
+    <div class="exp-open-bar">
+      <button class="btn bp" id="openExp" style="gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        데이터 내보내기
+      </button>
+    </div>
+    <div class="card" id="sumCard">
+      <div class="legend">
+        <span><i class="dot" style="background:var(--cap)"></i>신청(미접수)</span>
+        <span><i class="dot" style="background:var(--crc)"></i>접수완료</span>
+        <span><i class="dot" style="background:var(--csh)"></i>배송완료</span>
+        <span><i class="dot" style="background:var(--cst)"></i>입고완료</span>
+      </div>
+      <div class="fbar">
+        <div class="field"><label>호선 필터</label>
+          <select class="ctrl" id="fHull"><option value="">전체 호선</option></select></div>
+        <div class="field" id="fDeptWrap"><label>담당과 필터</label>
+          <select class="ctrl" id="fDept"><option value="">전체</option>
+            <option value="선실1과">선실1과</option><option value="선실2과">선실2과</option></select></div>
+      </div>
+      <div id="sumBody"></div>
+    </div>
+    <div id="sumDetail" style="display:none"></div>
+  </div>
 </section>
 
 <!-- ── 선실1과 ── -->
@@ -814,7 +865,7 @@ function initRealtime(){
 function refreshView(){
   const active=document.querySelector('.view.on')?.id?.replace('view-','');
   if(!active)return;
-  if(active==='summary'){const sd=$('#sumDetail');if(sd.style.display==='none')renderSummary();}
+  if(active==='summary'&&sumSess){const sd=$('#sumDetail');if(sd.style.display==='none')renderSummary();}
   if(active==='vendor'&&vSess){if($('#vDetail').style.display==='none')renderVendor();}
   if(active==='dept1'&&dSess['선실1과']){if($('#d1Detail').style.display==='none')renderDept('선실1과');}
   if(active==='dept2'&&dSess['선실2과']){if($('#d2Detail').style.display==='none')renderDept('선실2과');}
@@ -822,7 +873,7 @@ function refreshView(){
 }
 
 /* ─── SESSION ─── */
-let vSess=null,dSess={'선실1과':false,'선실2과':false},aSess=false;
+let vSess=null,dSess={'선실1과':false,'선실2과':false},aSess=false,sumSess=null;
 let apEditSess=null; // {team}
 
 /* ─── HELPERS ─── */
@@ -832,6 +883,21 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const uid=()=>'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const ptLb=k=>(PT.find(p=>p.k===k)||{}).lb||k;
 function toast(m,t){const e=$('#toast');e.textContent=m;e.className='on'+(t?' '+t:'');setTimeout(()=>e.className='',2300);}
+// ── SUMMARY 권한 헬퍼 ───────────────────────────────────────────────────────
+function sumGetPw(type,name){
+  if(type==='team')return DB.teamPw[name];
+  if(type==='vendor')return DB.vendorPw[name];
+  if(type==='dept')return DB.deptPw[name];
+  if(type==='admin')return DB.adminPw;
+  return null;}
+function sumFilterApps(apps){
+  if(!sumSess)return apps;
+  if(sumSess.type==='admin')return apps;
+  if(sumSess.type==='team')return apps.filter(a=>a.team===sumSess.name);
+  if(sumSess.type==='vendor')return apps.filter(a=>a.vendor===sumSess.name);
+  if(sumSess.type==='dept')return apps.filter(a=>a.dept===sumSess.name);
+  return apps;}
+
 function stPill(key){const s=ST[key];return `<span class="sp" style="color:${s.t};background:${s.bg}"><i class="dot sm" style="background:${s.c}"></i>${s.lb}</span>`;}
 function ifHtml(k,v){return v?`<div class="if"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:''}
 
@@ -1138,11 +1204,34 @@ function openVDetail(type,day){
 }
 
 /* ─── SUMMARY VIEW ─── */
-function initSummary(){$('#fHull').onchange=renderSummary;$('#fDept').onchange=renderSummary;}
+function initSummary(){
+  $('#fHull').onchange=renderSummary;
+  $('#fDept').onchange=renderSummary;
+  $('#sumPw').addEventListener('keydown',e=>{if(e.key==='Enter')doSumLogin();});
+  $('#sumLogin').onclick=doSumLogin;
+  $('#sumLogout').onclick=()=>{sumSess=null;$('#sumBoard').style.display='none';$('#sumGate').style.display='';$('#sumPw').value='';};
+}
+function doSumLogin(){
+  const roleVal=$('#sumRole').value,pw=$('#sumPw').value;
+  if(!roleVal){toast('소속을 선택하세요','err');return;}
+  const sep=roleVal.indexOf(':'),type=roleVal.slice(0,sep),name=roleVal.slice(sep+1);
+  const expected=sumGetPw(type,name);
+  if(expected===undefined||expected===null){toast('비밀번호 정보를 찾을 수 없습니다','err');return;}
+  if(expected!==pw){toast('비밀번호가 일치하지 않습니다','err');return;}
+  sumSess={type,name};$('#sumPw').value='';renderSummary();}
 function renderSummary(){
+  // 게이트/보드 전환
+  if(!sumSess){$('#sumGate').style.display='';$('#sumBoard').style.display='none';return;}
+  $('#sumGate').style.display='none';$('#sumBoard').style.display='';
+  // 로그인 정보 표시
+  const roleMap={team:'소속팀',vendor:'업체',dept:'담당과',admin:'관리자'};
+  $('#sumWho').textContent=sumSess.name;
+  $('#sumRoleLbl').textContent=roleMap[sumSess.type]+(sumSess.type==='admin'?' · 전체 조회':' · 본인 데이터');
+  // 담당과 필터는 dept 권한이면 숨김 (이미 필터됨)
+  $('#fDeptWrap').style.display=sumSess.type==='dept'?'none':'';
   $('#sumTtl').textContent=cw().label+' 신청 집계표';
   const hSel=$('#fHull'),pH=hSel.value;
-  const wkA=DB.apps.filter(a=>a.weekNo===curWk);
+  const wkA=sumFilterApps(DB.apps.filter(a=>a.weekNo===curWk));
   const hulls=[...new Set(wkA.map(a=>a.hull).filter(Boolean))].sort();
   hSel.innerHTML='<option value="">전체 호선</option>'+hulls.map(h=>`<option value="${esc(h)}"${h===pH?' selected':''}>${esc(h)}</option>`).join('');
   const hf=hSel.value,df=$('#fDept').value;
@@ -1182,7 +1271,7 @@ function openSumDetail(vendor,type,iso,hf,df){
   const wrap=$('#sumDetail');wrap.style.display='';
   const verified=new Set();
   const render=()=>{
-    const list=DB.apps.filter(a=>a.weekNo===curWk&&a.vendor===vendor&&a.type===type&&a.iso===iso&&(!hf||a.hull===hf)&&(!df||a.dept===df));
+    const list=sumFilterApps(DB.apps).filter(a=>a.weekNo===curWk&&a.vendor===vendor&&a.type===type&&a.iso===iso&&(!hf||a.hull===hf)&&(!df||a.dept===df));
     wrap.innerHTML='';
     const top=el('div','dtop');
     top.innerHTML=`<button class="back" id="sBack">← 집계표로</button>
