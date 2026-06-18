@@ -830,6 +830,16 @@ function fromRow(r){
     status:r.status,eta:r.eta||'',shipDate:r.ship_date||'',
     followShip:r.follow_ship||false,subMaterial:r.sub_material||'',
     createdAt:new Date(r.created_at).getTime()};}
+/* 자재종류별 표시 필드 헬퍼 */
+function typeFields(a){
+  const isWC=a.type==='Wall'||a.type==='Ceiling';
+  const pnL=a.type==='Ceiling'?'룸번호':a.type==='Door부자재'?'도어번호':a.type==='Panel부자재'?'룸번호':'판넬번호';
+  const ntL=a.type==='Ceiling'?'판넬길이':(!isWC)?'신청내용(비고)':'특이사항(비고)';
+  const subPart=(!isWC&&a.subMaterial)?ifHtml('신청부자재',a.subMaterial):'';
+  const folPart=isWC?ifHtml('후속선반영',a.followShip?'Y':'N'):'';
+  const notePart=a.note?`<div class="if"><div class="k">${ntL}</div><div class="v note">${esc(a.note)}</div></div>`:'';
+  return ifHtml(pnL,a.panelNo)+subPart+folPart+notePart;
+}
 
 // ── 로딩 UI ──────────────────────────────────────────────────────────────────
 let _loadN=0;
