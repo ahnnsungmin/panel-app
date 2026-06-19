@@ -3575,7 +3575,8 @@
       try {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
-        const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+        const swReg = await navigator.serviceWorker.ready;
+        const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
         if (!token) return;
         const { error } = await sb.from('push_tokens').upsert(
           { role_type: roleType, role_name: roleName, token, updated_at: new Date().toISOString() },
