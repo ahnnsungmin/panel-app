@@ -768,6 +768,9 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
 
 <!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Firebase CDN (FCM 푸시 알림) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 
 <script>
 // ── SUPABASE 연결 설정 ──────────────────────────────────────────────────────
@@ -1088,6 +1091,7 @@ function initApply(){
     btn.disabled=false;
     if(!ok){toast('비밀번호가 일치하지 않습니다','err');return;}
     apEditSess={team:t,password:pw};$('#apEPw').value='';
+    registerPushToken('team',t);
     $('#apEditGate').style.display='none';renderApplyEdit();$('#apEditBoard').style.display='';
   };
 }
@@ -1211,6 +1215,7 @@ function initHandlerModal(){
     newApps.forEach(a=>DB.apps.push(a));
     $('#hMod').style.display='none';_pending=null;
     sbUpsertApps(newApps);
+    newApps.forEach(a => sendNotify('INSERT', toRow(a)));
     toast(`${items.length}건이 신청되었습니다 (담당: ${handler})`,'ok');
     const rows=$('#apRows');rows.innerHTML='';rows.appendChild(rowTpl());renum();$('#apPw').value='';
     if(apEditSess&&apEditSess.team===team)renderApplyEdit();
@@ -1226,7 +1231,7 @@ function initVendor(){
     const ok=await verifyPw('vendor',n,pw);
     btn.disabled=false;
     if(!ok){toast('비밀번호가 일치하지 않습니다','err');return;}
-    vSess=n;$('#vPw').value='';renderVendor();};
+    vSess=n;$('#vPw').value='';renderVendor();registerPushToken('vendor',n);};
   $('#vLogout').onclick=()=>{vSess=null;renderVendor();};}
 function renderVendor(){
   const gate=$('#vGate'),board=$('#vBoard');
@@ -1305,8 +1310,8 @@ function openVDetail(type,day){
         </div>`;
       const recv=r.querySelector('[data-k="recv"]'),ship=r.querySelector('[data-k="ship"]'),
             sd=r.querySelector('[data-k="sd"]'),eta=r.querySelector('[data-k="eta"]');
-      recv.onchange=()=>{a.status=recv.checked?'received':'applied';if(!recv.checked)a.shipDate='';render();toast(recv.checked?'접수완료':'접수해제','ok');sbUpsertApps([a]);};
-      ship.onchange=()=>{if(ship.checked){a.status='shipped';if(!a.shipDate)a.shipDate=day.iso;}else{a.status='received';a.shipDate='';}render();toast(ship.checked?'배송완료':'배송해제','ok');sbUpsertApps([a]);};
+      recv.onchange=()=>{a.status=recv.checked?'received':'applied';if(!recv.checked)a.shipDate='';render();toast(recv.checked?'접수완료':'접수해제','ok');sbUpsertApps([a]);if(recv.checked)sendNotify('UPDATE',toRow(a),{...toRow(a),status:'applied'});};
+      ship.onchange=()=>{if(ship.checked){a.status='shipped';if(!a.shipDate)a.shipDate=day.iso;}else{a.status='received';a.shipDate='';}render();toast(ship.checked?'배송완료':'배송해제','ok');sbUpsertApps([a]);if(ship.checked)sendNotify('UPDATE',toRow(a),{...toRow(a),status:'received'});};
       sd.onchange=()=>{a.shipDate=sd.value;toast('배송완료일 저장','ok');sbUpsertApps([a]);};
       eta.onchange=()=>{a.eta=eta.value;toast('입고예정일 저장','ok');sbUpsertApps([a]);};
       r.querySelector(`[data-vopen="${a.id}"]`)?.addEventListener('click',()=>{
@@ -1346,7 +1351,7 @@ async function doSumLogin(){
   const ok=await verifyPw(type,name,pw);
   btn.disabled=false;
   if(!ok){toast('비밀번호가 일치하지 않습니다','err');return;}
-  sumSess={type,name};$('#sumPw').value='';renderSummary();}
+  sumSess={type,name};$('#sumPw').value='';renderSummary();registerPushToken(type,name);}
 function renderSummary(){
   // 게이트/보드 전환
   if(!sumSess){$('#sumGate').style.display='';$('#sumBoard').style.display='none';return;}
@@ -1440,9 +1445,9 @@ function openSumDetail(vendor,type,iso,hf,df){
           const ok=await verifyPw('team',a.team,pw);
           btn.disabled=false;
           if(!ok){toast('소속팀 비밀번호가 일치하지 않습니다','err');return;}
-          verified.add(a.team);a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);};
+          verified.add(a.team);a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);sendNotify('UPDATE',toRow(a),{...toRow(a),status:'shipped'});};
         ob.onclick=()=>{
-          if(verified.has(a.team)){a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);return;}
+          if(verified.has(a.team)){a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);sendNotify('UPDATE',toRow(a),{...toRow(a),status:'shipped'});return;}
           cb.style.display='';cb.querySelector('[data-cpw]').focus();};
         cb.querySelector('[data-cgo]').onclick=doSt;
         cb.querySelector('[data-cpw]').addEventListener('keydown',e=>{if(e.key==='Enter')doSt();});
@@ -1463,7 +1468,7 @@ function initDepts(){
       const ok=await verifyPw('dept',dept,pw);
       btn.disabled=false;
       if(!ok){toast('비밀번호가 일치하지 않습니다','err');return;}
-      dSess[dept]=true;$('#d'+n+'Pw').value='';renderDept(dept);};
+      dSess[dept]=true;$('#d'+n+'Pw').value='';renderDept(dept);registerPushToken('dept',dept);};
     $('#d'+n+'Logout').onclick=()=>{dSess[dept]=false;renderDept(dept);};
   });
 }
@@ -1525,7 +1530,7 @@ function openDeptDetail(dept,type,day){
         </div>
         <div class="rcact">${act}</div>`;
       r.querySelector(`[data-sid="${a.id}"]`)?.addEventListener('click',()=>{
-        a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);
+        a.status='stocked';render();toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);sendNotify('UPDATE',toRow(a),{...toRow(a),status:'shipped'});
       });
       card.appendChild(r);
     });
@@ -1545,7 +1550,7 @@ function initAdmin(){
     const ok=await verifyPw('admin','관리자',pw);
     btn.disabled=false;
     if(!ok){toast('관리자 비밀번호가 일치하지 않습니다','err');return;}
-    aSess=pw;$('#admPw').value='';renderAdmin();};
+    aSess=pw;$('#admPw').value='';renderAdmin();registerPushToken('admin','관리자');};
   $('#saveTeam').onclick=async()=>{
     const patch={};
     $$('#teamPwL .pwit').forEach(it=>{const v=it.querySelector('input').value;if(v)patch[it.dataset.n]=v;});
@@ -1783,6 +1788,58 @@ function runExport(){
       </table>
     </div>`;
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// FCM 푸시 알림
+// ════════════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "여기에_입력",
+  authDomain:        "여기에_입력",
+  projectId:         "여기에_입력",
+  storageBucket:     "여기에_입력",
+  messagingSenderId: "여기에_입력",
+  appId:             "여기에_입력",
+};
+firebase.initializeApp(firebaseConfig);
+const fcmMessaging = firebase.messaging();
+const VAPID_KEY = "여기에_VAPID_공개키_입력";
+
+// 상태 변경 직후 알림 서버 호출 (Database Webhook 없이 클라이언트가 직접 트리거)
+async function sendNotify(type, record, oldRecord = null) {
+  try {
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-app-secret': APP_SECRET },
+      body: JSON.stringify({ type, record, old_record: oldRecord }),
+    });
+  } catch (e) {
+    console.warn('알림 전송 실패 (무시됨):', e.message);
+  }
+}
+
+// 로그인 성공 시 FCM 토큰 등록
+async function registerPushToken(roleType, roleName) {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    const token = await fcmMessaging.getToken({ vapidKey: VAPID_KEY });
+    if (!token) return;
+    const { error } = await sb.from('push_tokens').upsert(
+      { role_type: roleType, role_name: roleName, token, updated_at: new Date().toISOString() },
+      { onConflict: 'token' }
+    );
+    if (error) throw error;
+    toast('알림이 활성화되었습니다 🔔', 'ok');
+  } catch (e) {
+    console.error('Push 등록 실패:', e);
+  }
+}
+
+// 포그라운드 메시지 수신 (앱이 열려있을 때)
+fcmMessaging.onMessage(payload => {
+  const { title, body } = payload.notification;
+  toast(`${title}: ${body}`, 'ok');
+});
 </script>
 </body>
 </html>

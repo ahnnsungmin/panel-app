@@ -1,67 +1,68 @@
-// ── Service Worker · 판넬 신청/입고 현황 PWA ──
+/**
+ * sw.js  —  Service Worker (PWA + FCM)
+ */
+
+// Firebase SW SDK
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+
+// ⚠️ 아래 값을 Firebase Console에서 복사한 실제 값으로 교체하세요.
+// index.html의 firebaseConfig와 반드시 동일해야 합니다.
+firebase.initializeApp({
+  apiKey:            "여기에_입력",
+  authDomain:        "여기에_입력",
+  projectId:         "여기에_입력",
+  storageBucket:     "여기에_입력",
+  messagingSenderId: "여기에_입력",
+  appId:             "여기에_입력",
+});
+
+const messaging = firebase.messaging();
+
+// ── 백그라운드 푸시 수신 (앱이 닫혀있거나 백그라운드일 때) ──────────────────────
+messaging.onBackgroundMessage(payload => {
+  const { title, body } = payload.notification;
+  self.registration.showNotification(title, {
+    body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'panel-notify',
+    renotify: true,
+    data: { url: payload.fcmOptions?.link || '/' },
+  });
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes(self.location.origin));
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    })
+  );
+});
+
+// ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
 const CACHE = 'panel-v1';
-const SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css',
-  'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap',
-];
+const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
-// 설치: 앱 셸 캐시
 self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { mode: 'cors' })).filter(() => true))
-      .catch(() => {}))
-  );
 });
-
-// 활성화: 오래된 캐시 삭제
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
+  self.clients.claim();
 });
-
-// Fetch 전략:
-// - Supabase API → Network Only (항상 최신 데이터)
-// - 폰트/CSS → Cache First
-// - 나머지 → Network First with Cache Fallback
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-
-  // Supabase API: 항상 네트워크
-  if (url.hostname.includes('supabase.co')) {
-    e.respondWith(fetch(e.request).catch(() =>
-      new Response(JSON.stringify({ error: '오프라인 상태입니다. 인터넷 연결을 확인하세요.' }),
-        { headers: { 'Content-Type': 'application/json' }, status: 503 })
-    ));
-    return;
-  }
-
-  // 폰트/정적 CDN: Cache First
-  if (url.hostname.includes('cdn.jsdelivr.net') ||
-      url.hostname.includes('fonts.googleapis.com') ||
-      url.hostname.includes('fonts.gstatic.com')) {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      }))
-    );
-    return;
-  }
-
-  // 앱 파일: Network First → Cache Fallback
+  if (e.request.method !== 'GET') return;
+  // chrome-extension 등 지원하지 않는 스킴은 캐시 시도하지 않음
+  if (!e.request.url.startsWith('http')) return;
   e.respondWith(
-    fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
-      return res;
-    }).catch(() => caches.match(e.request).then(c => c || caches.match('/index.html')))
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
