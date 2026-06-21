@@ -71,6 +71,12 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // ── 임시 디버그: 서비스워커가 실제로 몇 번 호출되는지 확인용 ──────────────────
+  if (req.body.action === 'sw-debug-log') {
+    console.log('🔍 SW 디버그:', JSON.stringify(req.body));
+    return res.json({ ok: true });
+  }
+
   const { type, record, old_record } = req.body;
   console.log('요청 수신:', JSON.stringify({ type, id: record?.id, status: record?.status, old_status: old_record?.status }));
 
