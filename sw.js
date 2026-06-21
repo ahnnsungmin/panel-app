@@ -1,5 +1,6 @@
 /**
  * sw.js  —  Service Worker (PWA + FCM)
+ * [임시 디버그 모드 — 문제 해결 후 디버그 코드 제거 예정]
  */
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
@@ -16,12 +17,24 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+const APP_SECRET = 'panel2026secret'; // index.html의 APP_SECRET과 동일해야 함
+
+function debugLog(data) {
+  return fetch('/api/notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-app-secret': APP_SECRET },
+    body: JSON.stringify({ action: 'sw-debug-log', ...data }),
+  }).catch(() => {});
+}
+
 // ── 백그라운드 푸시 수신 (앱이 닫혀있거나 백그라운드일 때) ──────────────────────
-// tag를 건마다 고유하게 지정 → 같은 건이 중복 전달돼도 브라우저가 자동으로 1개로 합침
-// (renotify를 빼서, 같은 tag는 "새 알림"이 아니라 "교체"로 처리되도록 함)
 messaging.onBackgroundMessage(payload => {
+  const invocationId = Math.random().toString(36).slice(2, 8);
   const { title, body } = payload.notification;
   const tag = payload.data?.dedupeKey || 'panel-notify';
+
+  // 디버그: 이 핸들러가 호출될 때마다 서버에 기록 (showNotification 호출 전에 먼저 기록)
+  debugLog({ invocationId, tag, body, time: new Date().toISOString() });
 
   self.registration.showNotification(title, {
     body,
@@ -45,7 +58,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 // ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
-const CACHE = 'panel-v3';
+const CACHE = 'panel-v4-debug';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
