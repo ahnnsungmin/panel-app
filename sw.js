@@ -1,6 +1,6 @@
 /**
  * sw.js  —  Service Worker (PWA + FCM)
- * [임시 디버그 모드 — 문제 해결 후 디버그 코드 제거 예정]
+ * data-only 메시지 방식: onBackgroundMessage가 항상 확실히 호출됨
  */
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
@@ -17,31 +17,18 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-const APP_SECRET = 'panel2026secret'; // index.html의 APP_SECRET과 동일해야 함
-
-function debugLog(data) {
-  return fetch('/api/notify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-app-secret': APP_SECRET },
-    body: JSON.stringify({ action: 'sw-debug-log', ...data }),
-  }).catch(() => {});
-}
-
 // ── 백그라운드 푸시 수신 (앱이 닫혀있거나 백그라운드일 때) ──────────────────────
+// data-only 메시지라서 이 핸들러가 반드시 호출됨 (브라우저 자동표시 없음)
 messaging.onBackgroundMessage(payload => {
-  const invocationId = Math.random().toString(36).slice(2, 8);
-  const { title, body } = payload.notification;
-  const tag = payload.data?.dedupeKey || 'panel-notify';
-
-  // 디버그: 이 핸들러가 호출될 때마다 서버에 기록 (showNotification 호출 전에 먼저 기록)
-  debugLog({ invocationId, tag, body, time: new Date().toISOString() });
+  const { title, body, dedupeKey, link } = payload.data || {};
+  if (!title) return;
 
   self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag,
-    data: { url: payload.fcmOptions?.link || '/' },
+    tag: dedupeKey || 'panel-notify',
+    data: { url: link || '/' },
   });
 });
 
@@ -58,7 +45,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 // ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
-const CACHE = 'panel-v4-debug';
+const CACHE = 'panel-v5-data';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
