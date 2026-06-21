@@ -6,15 +6,13 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-// ⚠️ 아래 값을 Firebase Console에서 복사한 실제 값으로 교체하세요.
-// index.html의 firebaseConfig와 반드시 동일해야 합니다.
 firebase.initializeApp({
-  apiKey:            "여기에_입력",
-  authDomain:        "여기에_입력",
-  projectId:         "여기에_입력",
-  storageBucket:     "여기에_입력",
-  messagingSenderId: "여기에_입력",
-  appId:             "여기에_입력",
+  apiKey: "AIzaSyAkgSzuTVqVWiY86GU7tgWLtEQRQFlLK-o",
+  authDomain: "panelrequest-b95b6.firebaseapp.com",
+  projectId: "panelrequest-b95b6",
+  storageBucket: "panelrequest-b95b6.firebasestorage.app",
+  messagingSenderId: "727086512417",
+  appId: "1:727086512417:web:e65e845678421505906660",
 });
 
 const messaging = firebase.messaging();
@@ -53,7 +51,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 // ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
-const CACHE = 'panel-v1';
+const CACHE = 'panel-v2';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -68,7 +66,6 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // chrome-extension 등 지원하지 않는 스킴은 캐시 시도하지 않음
   if (!e.request.url.startsWith('http')) return;
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
