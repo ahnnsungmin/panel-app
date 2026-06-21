@@ -2816,6 +2816,7 @@
         const ok = await verifyPw('team', team, pw);
         btn.disabled = false;
         if (!ok) { toast('비밀번호가 일치하지 않습니다', 'err'); return; }
+        registerPushToken('team', team);
         showHandlerModal(team, type, iso, day, items);
       };
       // Edit section
