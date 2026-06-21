@@ -71,20 +71,12 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // ── 임시 디버그: 서비스워커가 실제로 몇 번 호출되는지 확인용 ──────────────────
-  if (req.body.action === 'sw-debug-log') {
-    console.log('🔍 SW 디버그:', JSON.stringify(req.body));
-    return res.json({ ok: true });
-  }
-
   const { type, record, old_record } = req.body;
-  console.log('요청 수신:', JSON.stringify({ type, id: record?.id, status: record?.status, old_status: old_record?.status }));
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-  // ── 중복 발송 방지 (DB 유니크 제약으로 원자적 차단 — 타이밍 경합 자체가 불가능) ──
+  // ── 중복 발송 방지 (DB 유니크 제약으로 원자적 차단) ─────────────────────────
   // app_id + status 조합으로 notification_log에 딱 1번만 기록 가능 (UNIQUE 제약)
-  // 두 요청이 동시에 들어와도 둘 중 하나만 INSERT 성공, 나머지는 23505 에러로 자동 차단됨
   const dedupeStatus = type === 'INSERT' ? 'INSERT' : record.status;
   const { error: insErr } = await supabase
     .from('notification_log')
@@ -92,12 +84,9 @@ export default async function handler(req, res) {
 
   if (insErr) {
     if (insErr.code === '23505') {
-      console.log('중복으로 판단되어 발송 건너뜀 (unique 제약):', record.id, dedupeStatus);
       return res.json({ sent: 0, deduped: true });
     }
-    console.error('dedupe 기록 실패(원인불명, 일단 진행):', insErr.message, insErr);
-  } else {
-    console.log('dedupe 기록 성공, 발송 진행:', record.id, dedupeStatus);
+    console.error('dedupe 기록 실패:', insErr.message);
   }
 
   const notifications = buildNotifications(type, record, old_record);
@@ -113,17 +102,14 @@ export default async function handler(req, res) {
       .eq('role_type', notif.roleType)
       .eq('role_name', notif.roleName);
 
-    if (!rows?.length) {
-      console.log('토큰 없음:', notif.roleType, notif.roleName);
-      continue;
-    }
+    if (!rows?.length) continue;
 
     for (const { token } of rows) {
       try {
         await messaging.send({
           token,
-          // notification 필드를 빼고 data만 사용 → 브라우저 자동표시를 막고
-          // 반드시 sw.js의 onBackgroundMessage를 거치도록 강제함
+          // notification 필드 없이 data만 사용 → 반드시 sw.js의
+          // onBackgroundMessage를 거치도록 해서 중복 표시를 막음
           data: {
             title: notif.title,
             body: notif.body,
@@ -135,9 +121,8 @@ export default async function handler(req, res) {
           },
         });
         sent++;
-        console.log('FCM 발송 성공:', notif.roleType, notif.roleName, token.slice(0, 12) + '...');
       } catch (e) {
-        console.error('FCM 발송 실패:', notif.roleType, notif.roleName, e.code, e.message);
+        console.error('FCM 발송 실패:', notif.roleType, notif.roleName, e.code);
         if (e.code === 'messaging/registration-token-not-registered') {
           await supabase.from('push_tokens').delete().eq('token', token);
         }
