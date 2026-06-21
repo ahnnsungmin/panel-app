@@ -77,19 +77,31 @@ export default async function handler(req, res) {
 
   // ── 중복 발송 방지 (같은 건 + 같은 상태가 최근 30초 내 이미 발송됐는지 확인) ──
   const dedupeStatus = type === 'INSERT' ? 'INSERT' : record.status;
-  const { data: recent } = await supabase
+  const { data: recent, error: checkErr } = await supabase
     .from('notification_log')
-    .select('id')
+    .select('id, sent_at')
     .eq('app_id', record.id)
     .eq('status', dedupeStatus)
     .gte('sent_at', new Date(Date.now() - 30000).toISOString())
     .limit(1);
 
+  if (checkErr) {
+    console.error('dedupe 조회 실패:', checkErr.message, checkErr);
+  } else {
+    console.log('dedupe 조회 결과:', { app_id: record.id, status: dedupeStatus, found: recent?.length || 0 });
+  }
+
   if (recent && recent.length) {
+    console.log('중복으로 판단되어 발송 건너뜀:', record.id, dedupeStatus);
     return res.json({ sent: 0, deduped: true });
   }
-  // 발송 직전에 먼저 기록을 남겨 "내가 처리 중"임을 표시 (동시 요청 경합 최소화)
-  await supabase.from('notification_log').insert({ app_id: record.id, status: dedupeStatus });
+
+  const { error: insErr } = await supabase
+    .from('notification_log')
+    .insert({ app_id: record.id, status: dedupeStatus });
+  if (insErr) {
+    console.error('dedupe 기록 실패:', insErr.message, insErr);
+  }
 
   const notifications = buildNotifications(type, record, old_record);
   if (!notifications.length) return res.json({ sent: 0, skipped: true });
