@@ -72,35 +72,26 @@ export default async function handler(req, res) {
   }
 
   const { type, record, old_record } = req.body;
+  console.log('요청 수신:', JSON.stringify({ type, id: record?.id, status: record?.status, old_status: old_record?.status }));
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-  // ── 중복 발송 방지 (같은 건 + 같은 상태가 최근 30초 내 이미 발송됐는지 확인) ──
+  // ── 중복 발송 방지 (DB 유니크 제약으로 원자적 차단 — 타이밍 경합 자체가 불가능) ──
+  // app_id + status 조합으로 notification_log에 딱 1번만 기록 가능 (UNIQUE 제약)
+  // 두 요청이 동시에 들어와도 둘 중 하나만 INSERT 성공, 나머지는 23505 에러로 자동 차단됨
   const dedupeStatus = type === 'INSERT' ? 'INSERT' : record.status;
-  const { data: recent, error: checkErr } = await supabase
-    .from('notification_log')
-    .select('id, sent_at')
-    .eq('app_id', record.id)
-    .eq('status', dedupeStatus)
-    .gte('sent_at', new Date(Date.now() - 30000).toISOString())
-    .limit(1);
-
-  if (checkErr) {
-    console.error('dedupe 조회 실패:', checkErr.message, checkErr);
-  } else {
-    console.log('dedupe 조회 결과:', { app_id: record.id, status: dedupeStatus, found: recent?.length || 0 });
-  }
-
-  if (recent && recent.length) {
-    console.log('중복으로 판단되어 발송 건너뜀:', record.id, dedupeStatus);
-    return res.json({ sent: 0, deduped: true });
-  }
-
   const { error: insErr } = await supabase
     .from('notification_log')
     .insert({ app_id: record.id, status: dedupeStatus });
+
   if (insErr) {
-    console.error('dedupe 기록 실패:', insErr.message, insErr);
+    if (insErr.code === '23505') {
+      console.log('중복으로 판단되어 발송 건너뜀 (unique 제약):', record.id, dedupeStatus);
+      return res.json({ sent: 0, deduped: true });
+    }
+    console.error('dedupe 기록 실패(원인불명, 일단 진행):', insErr.message, insErr);
+  } else {
+    console.log('dedupe 기록 성공, 발송 진행:', record.id, dedupeStatus);
   }
 
   const notifications = buildNotifications(type, record, old_record);
