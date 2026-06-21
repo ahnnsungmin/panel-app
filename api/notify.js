@@ -116,7 +116,10 @@ export default async function handler(req, res) {
       .eq('role_type', notif.roleType)
       .eq('role_name', notif.roleName);
 
-    if (!rows?.length) continue;
+    if (!rows?.length) {
+      console.log('토큰 없음:', notif.roleType, notif.roleName);
+      continue;
+    }
 
     for (const { token } of rows) {
       try {
@@ -129,7 +132,9 @@ export default async function handler(req, res) {
           },
         });
         sent++;
+        console.log('FCM 발송 성공:', notif.roleType, notif.roleName, token.slice(0, 12) + '...');
       } catch (e) {
+        console.error('FCM 발송 실패:', notif.roleType, notif.roleName, e.code, e.message);
         if (e.code === 'messaging/registration-token-not-registered') {
           await supabase.from('push_tokens').delete().eq('token', token);
         }
