@@ -117,6 +117,7 @@ export default async function handler(req, res) {
         await messaging.send({
           token,
           notification: { title: notif.title, body: notif.body },
+          data: { dedupeKey: `panel-${record.id}-${dedupeStatus}` },
           webpush: {
             notification: { icon: '/icon-192.png', badge: '/icon-192.png' },
             fcmOptions: { link: process.env.APP_URL || '/' },
