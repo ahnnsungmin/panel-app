@@ -2,7 +2,6 @@
  * sw.js  —  Service Worker (PWA + FCM)
  */
 
-// Firebase SW SDK
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -18,22 +17,17 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // ── 백그라운드 푸시 수신 (앱이 닫혀있거나 백그라운드일 때) ──────────────────────
-messaging.onBackgroundMessage(async payload => {
+// tag를 건마다 고유하게 지정 → 같은 건이 중복 전달돼도 브라우저가 자동으로 1개로 합침
+// (renotify를 빼서, 같은 tag는 "새 알림"이 아니라 "교체"로 처리되도록 함)
+messaging.onBackgroundMessage(payload => {
   const { title, body } = payload.notification;
-
-  // 같은 내용의 알림이 이미 떠있으면 중복 표시 방지
-  // (배터리 최적화로 깨어날 때 같은 푸시가 기기에 두 번 전달되는 경우 대비)
-  const existing = await self.registration.getNotifications({ tag: 'panel-notify' });
-  if (existing.some(n => n.body === body)) {
-    return;
-  }
+  const tag = payload.data?.dedupeKey || 'panel-notify';
 
   self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: 'panel-notify',
-    renotify: true,
+    tag,
     data: { url: payload.fcmOptions?.link || '/' },
   });
 });
@@ -51,7 +45,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 // ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
-const CACHE = 'panel-v2';
+const CACHE = 'panel-v3';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
