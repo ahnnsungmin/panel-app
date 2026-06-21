@@ -72,10 +72,28 @@ export default async function handler(req, res) {
   }
 
   const { type, record, old_record } = req.body;
+
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+  // ── 중복 발송 방지 (같은 건 + 같은 상태가 최근 30초 내 이미 발송됐는지 확인) ──
+  const dedupeStatus = type === 'INSERT' ? 'INSERT' : record.status;
+  const { data: recent } = await supabase
+    .from('notification_log')
+    .select('id')
+    .eq('app_id', record.id)
+    .eq('status', dedupeStatus)
+    .gte('sent_at', new Date(Date.now() - 30000).toISOString())
+    .limit(1);
+
+  if (recent && recent.length) {
+    return res.json({ sent: 0, deduped: true });
+  }
+  // 발송 직전에 먼저 기록을 남겨 "내가 처리 중"임을 표시 (동시 요청 경합 최소화)
+  await supabase.from('notification_log').insert({ app_id: record.id, status: dedupeStatus });
+
   const notifications = buildNotifications(type, record, old_record);
   if (!notifications.length) return res.json({ sent: 0, skipped: true });
 
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
   const messaging = getMessaging();
   let sent = 0;
 
