@@ -122,11 +122,16 @@ export default async function handler(req, res) {
       try {
         await messaging.send({
           token,
-          notification: { title: notif.title, body: notif.body },
-          data: { dedupeKey: `panel-${record.id}-${dedupeStatus}` },
+          // notification 필드를 빼고 data만 사용 → 브라우저 자동표시를 막고
+          // 반드시 sw.js의 onBackgroundMessage를 거치도록 강제함
+          data: {
+            title: notif.title,
+            body: notif.body,
+            dedupeKey: `panel-${record.id}-${dedupeStatus}`,
+            link: process.env.APP_URL || '/',
+          },
           webpush: {
-            notification: { icon: '/icon-192.png', badge: '/icon-192.png' },
-            fcmOptions: { link: process.env.APP_URL || '/' },
+            headers: { Urgency: 'high' },
           },
         });
         sent++;
