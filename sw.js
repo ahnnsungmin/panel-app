@@ -9,19 +9,27 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-com
 // ⚠️ 아래 값을 Firebase Console에서 복사한 실제 값으로 교체하세요.
 // index.html의 firebaseConfig와 반드시 동일해야 합니다.
 firebase.initializeApp({
-  apiKey: "AIzaSyAkgSzuTVqVWiY86GU7tgWLtEQRQFlLK-o",
-  authDomain: "panelrequest-b95b6.firebaseapp.com",
-  projectId: "panelrequest-b95b6",
-  storageBucket: "panelrequest-b95b6.firebasestorage.app",
-  messagingSenderId: "727086512417",
-  appId: "1:727086512417:web:e65e845678421505906660",
+  apiKey:            "여기에_입력",
+  authDomain:        "여기에_입력",
+  projectId:         "여기에_입력",
+  storageBucket:     "여기에_입력",
+  messagingSenderId: "여기에_입력",
+  appId:             "여기에_입력",
 });
 
 const messaging = firebase.messaging();
 
 // ── 백그라운드 푸시 수신 (앱이 닫혀있거나 백그라운드일 때) ──────────────────────
-messaging.onBackgroundMessage(payload => {
+messaging.onBackgroundMessage(async payload => {
   const { title, body } = payload.notification;
+
+  // 같은 내용의 알림이 이미 떠있으면 중복 표시 방지
+  // (배터리 최적화로 깨어날 때 같은 푸시가 기기에 두 번 전달되는 경우 대비)
+  const existing = await self.registration.getNotifications({ tag: 'panel-notify' });
+  if (existing.some(n => n.body === body)) {
+    return;
+  }
+
   self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
