@@ -45,7 +45,7 @@ self.addEventListener('notificationclick', event => {
 });
 
 // ── PWA 캐싱 ─────────────────────────────────────────────────────────────────
-const CACHE = 'panel-v6-data';
+const CACHE = 'panel-v7-data';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
