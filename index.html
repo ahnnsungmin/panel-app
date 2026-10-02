@@ -1489,26 +1489,32 @@ function renderCumulative(){
   const dateMeta={};
   base.forEach(a=>{if(!dateMeta[a.iso])dateMeta[a.iso]={m:a.month,d:a.day,wd:a.wd};});
   const thDates=dates.map(iso=>`<th>${dateMeta[iso].m}/${dateMeta[iso].d}<br><span style="font-weight:500;opacity:.8">(${dateMeta[iso].wd})</span></th>`).join('');
-  // 업체별 × 날짜별 건수
+  // 접수완료: 업체별 / 배송완료: 담당자별
+  const isShip=cumStatus==='shipped';
+  const rowKey=isShip?'handler':'vendor';
+  const rowHd=isShip?'담당자':'업체명';
+  const rowList=isShip
+    ?[...new Set(base.map(a=>a.handler).filter(Boolean))].sort()
+    :VENDORS;
   let colTotals=dates.map(()=>0),grandTotal=0;
-  const vRows=VENDORS.map(v=>{
+  const vRows=rowList.map(rk=>{
     let rowTotal=0;
     const cells=dates.map((iso,i)=>{
-      const items=base.filter(a=>a.vendor===v&&a.iso===iso);
+      const items=base.filter(a=>a[rowKey]===rk&&a.iso===iso);
       if(!items.length)return`<td class="z">·</td>`;
       colTotals[i]+=items.length;rowTotal+=items.length;
-      return`<td><button class="cnum" data-v="${esc(v)}" data-iso="${iso}">${items.length}</button></td>`;
+      return`<td><button class="cnum" data-rk="${esc(rk)}" data-iso="${iso}">${items.length}</button></td>`;
     }).join('');
     grandTotal+=rowTotal;
     return rowTotal>0
-      ?`<tr><td class="vnm">${esc(v)}</td>${cells}<td class="tot">${rowTotal}</td></tr>`
-      :`<tr><td class="vnm" style="color:var(--mu)">${esc(v)}</td>${dates.map(()=>`<td class="z">·</td>`).join('')}<td class="tot z">0</td></tr>`;
+      ?`<tr><td class="vnm">${esc(rk)}</td>${cells}<td class="tot">${rowTotal}</td></tr>`
+      :`<tr><td class="vnm" style="color:var(--mu)">${esc(rk)}</td>${dates.map(()=>`<td class="z">·</td>`).join('')}<td class="tot z">0</td></tr>`;
   }).join('');
   const totCells=colTotals.map(n=>n?`<td>${n}</td>`:`<td class="z">·</td>`).join('');
   body.innerHTML=`
     <div class="ctblwrap">
       <table class="ctbl">
-        <thead><tr><th class="vhd">업체명</th>${thDates}<th>합계</th></tr></thead>
+        <thead><tr><th class="vhd">${rowHd}</th>${thDates}<th>합계</th></tr></thead>
         <tbody>${vRows}</tbody>
         <tfoot><tr class="tot-row"><td class="vnm" style="font-weight:700">일계</td>${totCells}<td>${grandTotal}</td></tr></tfoot>
       </table>
@@ -1521,12 +1527,11 @@ function renderCumulative(){
   // 숫자 클릭 → 하단 상세 패널
   body.querySelectorAll('.cnum').forEach(btn=>{
     btn.onclick=()=>{
-      const v=btn.dataset.v,iso=btn.dataset.iso;
-      const items=base.filter(a=>a.vendor===v&&a.iso===iso);
+      const rk=btn.dataset.rk,iso=btn.dataset.iso;
+      const items=base.filter(a=>a[rowKey]===rk&&a.iso===iso);
       const dm=dateMeta[iso];
-      openCumDetail(v,iso,dm,items);
-      // 활성 셀 표시
-      body.querySelectorAll('.cnum').forEach(b=>b.style.background='');
+      openCumDetail(rk,iso,dm,items,rowHd);
+      body.querySelectorAll('.cnum').forEach(b=>{b.style.background='';b.style.color='';});
       btn.style.background='var(--c2)';btn.style.color='#fff';
     };
   });
