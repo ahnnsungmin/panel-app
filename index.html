@@ -184,19 +184,26 @@ textarea.ctrl{resize:vertical;min-height:80px;line-height:1.5}
 .ctab{flex:1;padding:10px;border-radius:9px;font-size:13.5px;font-weight:700;border:1.5px solid var(--ln);background:#fff;color:var(--mu);cursor:pointer;text-align:center;transition:.15s}
 .ctab.on.recv{background:var(--brc);color:var(--trc);border-color:var(--crc)}
 .ctab.on.ship{background:var(--bsh);color:var(--tsh);border-color:var(--csh)}
-/* 누적 날짜 그룹 */
-.cum-date{background:var(--c1);color:#fff;padding:9px 14px;border-radius:8px 8px 0 0;margin-top:14px;display:flex;align-items:center;justify-content:space-between}
-.cum-date:first-child{margin-top:0}
-.cum-date .dlab{font-size:13.5px;font-weight:700;font-family:var(--mono)}
-.cum-date .dcnt{font-size:12px;background:rgba(255,255,255,.2);border-radius:5px;padding:2px 8px}
-.cum-rows{border:1px solid var(--ln);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:0}
-.cum-row{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--ls);background:#fff;cursor:pointer;transition:.12s}
-.cum-row:last-child{border-bottom:none}
-.cum-row:hover{background:var(--sf2)}
-.cum-vn{flex:1;padding:10px 14px;font-size:13px;font-weight:600;color:var(--ink)}
-.cum-pt{padding:10px 14px;font-size:12px;color:var(--mu);min-width:110px}
-.cum-cnt{padding:10px 14px;font-size:14px;font-weight:700;color:var(--c2);font-family:var(--mono);min-width:48px;text-align:right}
+/* 누적 매트릭스 표 */
 .cum-empty{text-align:center;padding:40px 20px;color:var(--mu);font-size:14px}
+.ctblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--ln);border-radius:11px}
+table.ctbl{width:100%;border-collapse:collapse;font-size:13px}
+table.ctbl th{background:var(--c1);color:#fff;padding:9px 10px;text-align:center;font-size:12px;font-weight:700;white-space:nowrap;position:sticky;top:0}
+table.ctbl th.vhd{text-align:left;min-width:100px;left:0;z-index:2;background:var(--c1)}
+table.ctbl td{padding:9px 10px;text-align:center;border-bottom:1px solid var(--ls);border-right:1px solid var(--ls)}
+table.ctbl td.vnm{font-weight:700;font-size:13px;text-align:left;background:#f8fafd;position:sticky;left:0;z-index:1;border-right:2px solid var(--ln)}
+table.ctbl td.tot{font-weight:700;color:var(--c2);font-family:var(--mono);background:#edf2fa}
+table.ctbl tr.tot-row td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:var(--mono)}
+table.ctbl tr:hover td:not(.vnm){background:#f0f5ff}
+table.ctbl td.z{color:#c2cad6;font-size:12px}
+.cnum{background:none;border:none;padding:4px 8px;border-radius:7px;font-family:var(--mono);font-weight:700;font-size:14px;color:var(--c2);cursor:pointer;transition:.12s}
+.cnum:hover{background:var(--c2);color:#fff}
+/* 누적 상세 패널 */
+.cum-det{background:#fff;border:1.5px solid var(--c2);border-radius:12px;padding:16px;margin-top:14px}
+.cum-det-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.cum-det-hdr h4{font-size:14px;font-weight:700;color:var(--c1)}
+.cum-det-cls{background:none;border:1px solid var(--ln);border-radius:7px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--mu);cursor:pointer}
+.cum-det-cls:hover{background:var(--sf2)}
 /* Stock confirm */
 .cs{border:1px dashed var(--csh);background:var(--bsh);border-radius:9px;padding:10px}
 .csrow{display:flex;gap:7px;margin-top:6px}
@@ -577,6 +584,7 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
         </div>
         <div id="cumBody"></div>
       </div>
+      <div id="cumDetail" style="display:none"></div>
     </div>
     <div class="card" id="sumCard">
       <div class="legend">
@@ -1465,53 +1473,95 @@ function renderSummary(){
 }
 function renderCumulative(){
   const hf=$('#cfHull').value,df=$('#cfDept').value;
-  // 전체 주차 데이터에서 상태 필터
-  const base=DB.apps.filter(a=>a.status===cumStatus&&(!hf||a.hull===hf)&&(!df||a.dept===df));
   // 호선 목록 동적 갱신
   const allH=[...new Set(DB.apps.filter(a=>a.status===cumStatus).map(a=>a.hull).filter(Boolean))].sort();
-  const curH=hf;
-  $('#cfHull').innerHTML='<option value="">전체 호선</option>'+allH.map(h=>`<option value="${esc(h)}"${h===curH?' selected':''}>${esc(h)}</option>`).join('');
+  $('#cfHull').innerHTML='<option value="">전체 호선</option>'+allH.map(h=>`<option value="${esc(h)}"${h===hf?' selected':''}>${esc(h)}</option>`).join('');
+  // 상태 필터 적용
+  const base=DB.apps.filter(a=>a.status===cumStatus&&(!hf||a.hull===hf)&&(!df||a.dept===df));
   const body=$('#cumBody');
+  $('#cumDetail').style.display='none';
   if(!base.length){body.innerHTML=`<div class="cum-empty">해당 상태의 내역이 없습니다.</div>`;return;}
-  // 날짜별 그룹 (iso 기준 정렬)
-  const byDate={};
-  base.forEach(a=>{(byDate[a.iso]=byDate[a.iso]||[]).push(a);});
-  const dates=Object.keys(byDate).sort();
+  // 날짜 목록 (데이터 있는 날만, 정렬)
+  const dates=[...new Set(base.map(a=>a.iso))].sort();
   const stLbl=cumStatus==='received'?'접수완료':'배송완료';
-  let total=0,html='';
-  dates.forEach(iso=>{
-    const items=byDate[iso];
-    total+=items.length;
-    const d=items[0];
-    const dLabel=`${d.month}/${d.day} (${d.wd}) · ${iso.slice(0,4)}년`;
-    // 업체+구분별 소계
-    const groups={};
-    items.forEach(a=>{const k=a.vendor+'__'+a.type;(groups[k]=groups[k]||[]).push(a);});
-    const gRows=Object.entries(groups).map(([k,arr])=>{
-      const [v,t]=k.split('__');
-      return`<div class="cum-row" data-iso="${iso}" data-v="${esc(v)}" data-pt="${esc(t)}">
-        <span class="cum-vn">${esc(v)}</span>
-        <span class="cum-pt">${ptLb(t)}</span>
-        <span class="cum-cnt">${arr.length}건</span>
-      </div>`;
+  const stColor=cumStatus==='received'?'var(--trc)':'var(--tsh)';
+  // 날짜 헤더 (M/D(요일) 형식)
+  const dateMeta={};
+  base.forEach(a=>{if(!dateMeta[a.iso])dateMeta[a.iso]={m:a.month,d:a.day,wd:a.wd};});
+  const thDates=dates.map(iso=>`<th>${dateMeta[iso].m}/${dateMeta[iso].d}<br><span style="font-weight:500;opacity:.8">(${dateMeta[iso].wd})</span></th>`).join('');
+  // 업체별 × 날짜별 건수
+  let colTotals=dates.map(()=>0),grandTotal=0;
+  const vRows=VENDORS.map(v=>{
+    let rowTotal=0;
+    const cells=dates.map((iso,i)=>{
+      const items=base.filter(a=>a.vendor===v&&a.iso===iso);
+      if(!items.length)return`<td class="z">·</td>`;
+      colTotals[i]+=items.length;rowTotal+=items.length;
+      return`<td><button class="cnum" data-v="${esc(v)}" data-iso="${iso}">${items.length}</button></td>`;
     }).join('');
-    html+=`<div class="cum-date"><span class="dlab">${dLabel}</span><span class="dcnt">${items.length}건</span></div>
-      <div class="cum-rows">${gRows}</div>`;
-  });
-  html+=`<div style="margin-top:14px;font-size:13px;color:var(--mu)">
-    <b style="color:var(--c2);font-family:var(--mono)">${stLbl}</b> 누적 합계 <b style="color:var(--c2);font-family:var(--mono)">${total}</b>건 (${dates.length}일)
-  </div>`;
-  body.innerHTML=html;
-  // 행 클릭 → 기존 집계표 상세 재활용
-  body.querySelectorAll('.cum-row').forEach(row=>{
-    row.onclick=()=>{
-      const iso=row.dataset.iso,v=row.dataset.v,pt=row.dataset.pt;
-      // 임시로 curWk를 해당 iso의 주차로 맞춤
-      const wk=DB.apps.find(a=>a.iso===iso)?.weekNo;
-      if(wk)curWk=wk;
-      openSumDetail(v,pt,iso,hf,df);
+    grandTotal+=rowTotal;
+    return rowTotal>0
+      ?`<tr><td class="vnm">${esc(v)}</td>${cells}<td class="tot">${rowTotal}</td></tr>`
+      :`<tr><td class="vnm" style="color:var(--mu)">${esc(v)}</td>${dates.map(()=>`<td class="z">·</td>`).join('')}<td class="tot z">0</td></tr>`;
+  }).join('');
+  const totCells=colTotals.map(n=>n?`<td>${n}</td>`:`<td class="z">·</td>`).join('');
+  body.innerHTML=`
+    <div class="ctblwrap">
+      <table class="ctbl">
+        <thead><tr><th class="vhd">업체명</th>${thDates}<th>합계</th></tr></thead>
+        <tbody>${vRows}</tbody>
+        <tfoot><tr class="tot-row"><td class="vnm" style="font-weight:700">일계</td>${totCells}<td>${grandTotal}</td></tr></tfoot>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--mu)">
+      <b style="color:${stColor};font-family:var(--mono)">${stLbl}</b> 누적 합계
+      <b style="color:var(--c2);font-family:var(--mono)">${grandTotal}</b>건 ·
+      <b style="font-family:var(--mono)">${dates.length}</b>일
+    </div>`;
+  // 숫자 클릭 → 하단 상세 패널
+  body.querySelectorAll('.cnum').forEach(btn=>{
+    btn.onclick=()=>{
+      const v=btn.dataset.v,iso=btn.dataset.iso;
+      const items=base.filter(a=>a.vendor===v&&a.iso===iso);
+      const dm=dateMeta[iso];
+      openCumDetail(v,iso,dm,items);
+      // 활성 셀 표시
+      body.querySelectorAll('.cnum').forEach(b=>b.style.background='');
+      btn.style.background='var(--c2)';btn.style.color='#fff';
     };
   });
+}
+function openCumDetail(vendor,iso,dm,items){
+  const det=$('#cumDetail');
+  det.style.display='';
+  const stLbl=cumStatus==='received'?'접수완료':'배송완료';
+  const infoRows=items.map(a=>`
+    <div class="rc" style="margin-bottom:10px">
+      <div>
+        <div style="margin-bottom:8px">${stPill(a.status)}</div>
+        <div class="rcinfo">
+          ${ifHtml('소속팀',a.team)}${ifHtml('담당자',a.handler)}${ifHtml('담당과',a.dept)}
+          ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
+          ${typeFields(a)}
+          ${ifHtml('입고예정일',a.eta)}
+          ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
+        </div>
+      </div>
+      <div class="rcact"><div class="sdone">✓ ${stLbl}</div></div>
+    </div>`).join('');
+  det.innerHTML=`
+    <div class="cum-det">
+      <div class="cum-det-hdr">
+        <h4>${esc(vendor)} · ${dm.m}/${dm.d}(${dm.wd}) · ${stLbl} ${items.length}건</h4>
+        <button class="cum-det-cls" id="cumDetClose">✕ 닫기</button>
+      </div>
+      ${infoRows}
+    </div>`;
+  det.querySelector('#cumDetClose').onclick=()=>{
+    det.style.display='none';
+    $('#cumBody').querySelectorAll('.cnum').forEach(b=>{b.style.background='';b.style.color='';});
+  };
+  det.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function openSumDetail(vendor,type,iso,hf,df){
   const day=cw().days.find(d=>d.iso===iso);
