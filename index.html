@@ -566,6 +566,7 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
     <div class="vt-bar" id="sumViewToggle" style="display:none">
       <button class="vtb on" id="btnWkView">📅 주차별</button>
       <button class="vtb" id="btnCumView">📊 누적 조회 (11주)</button>
+      <button class="vtb" id="btnAccumView">📦 누적 신청량</button>
     </div>
     <!-- 누적 조회 영역 -->
     <div id="sumCumul" style="display:none">
@@ -581,10 +582,27 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
           <div class="field"><label>담당과 필터</label>
             <select class="ctrl" id="cfDept"><option value="">전체</option>
               <option>선실1과</option><option>선실2과</option></select></div>
+          <div class="field" id="cfVendorWrap"><label>업체명 필터</label>
+            <select class="ctrl" id="cfVendor"><option value="">전체</option></select></div>
+          <div class="field"><label>소속팀 필터</label>
+            <select class="ctrl" id="cfTeam"><option value="">전체</option></select></div>
         </div>
         <div id="cumBody"></div>
       </div>
       <div id="cumDetail" style="display:none"></div>
+    </div>
+    <!-- 누적 신청량 영역 -->
+    <div id="sumAccum" style="display:none">
+      <div class="card">
+        <div class="ct"><span class="tg" style="background:var(--c2)">주차</span>누적 신청량 · 주차별</div>
+        <div class="fbar">
+          <div class="field"><label>시작 주차</label>
+            <select class="ctrl" id="acWkF"></select></div>
+          <div class="field"><label>종료 주차</label>
+            <select class="ctrl" id="acWkT"></select></div>
+        </div>
+        <div id="accumBody"></div>
+      </div>
     </div>
     <div class="card" id="sumCard">
       <div class="legend">
@@ -1403,15 +1421,26 @@ function initSummary(){
   $('#sumPw').addEventListener('keydown',e=>{if(e.key==='Enter')doSumLogin();});
   $('#sumLogin').onclick=doSumLogin;
   $('#sumLogout').onclick=()=>{sumSess=null;sumViewMode='week';$('#sumBoard').style.display='none';$('#sumGate').style.display='';$('#sumPw').value='';};
-  // 뷰 토글
-  $('#btnWkView').onclick=()=>{sumViewMode='week';$('#btnWkView').classList.add('on');$('#btnCumView').classList.remove('on');$('#sumCumul').style.display='none';$('#sumCard').style.display='';$('#sumDetail').style.display='none';renderSummary();};
-  $('#btnCumView').onclick=()=>{sumViewMode='cumul';$('#btnCumView').classList.add('on');$('#btnWkView').classList.remove('on');$('#sumCard').style.display='none';$('#sumDetail').style.display='none';$('#sumCumul').style.display='';renderCumulative();};
+  // 뷰 토글 공통 초기화
+  const vtBtns=['#btnWkView','#btnCumView','#btnAccumView'];
+  const hideAll=()=>{$('#sumCumul').style.display='none';$('#sumAccum').style.display='none';$('#sumCard').style.display='none';$('#sumDetail').style.display='none';vtBtns.forEach(id=>$(id).classList.remove('on'));};
+  $('#btnWkView').onclick=()=>{hideAll();sumViewMode='week';$('#btnWkView').classList.add('on');$('#sumCard').style.display='';renderSummary();};
+  $('#btnCumView').onclick=()=>{hideAll();sumViewMode='cumul';$('#btnCumView').classList.add('on');$('#sumCumul').style.display='';renderCumulative();};
+  $('#btnAccumView').onclick=()=>{hideAll();sumViewMode='accum';$('#btnAccumView').classList.add('on');$('#sumAccum').style.display='';renderAccum();};
   // 누적 상태 탭
   $('#ctRecv').onclick=()=>{cumStatus='received';$('#ctRecv').classList.add('on');$('#ctShip').classList.remove('on');renderCumulative();};
   $('#ctShip').onclick=()=>{cumStatus='shipped';$('#ctShip').classList.add('on');$('#ctRecv').classList.remove('on');renderCumulative();};
-  // 누적 필터
+  // 누적 조회 필터
   $('#cfHull').onchange=renderCumulative;
   $('#cfDept').onchange=renderCumulative;
+  $('#cfVendor').onchange=renderCumulative;
+  $('#cfTeam').onchange=renderCumulative;
+  // 누적 신청량 필터
+  $('#acWkF').onchange=renderAccum;
+  $('#acWkT').onchange=renderAccum;
+  // 업체명·소속팀 셀렉트 초기화
+  VENDORS.forEach(v=>{const o=document.createElement('option');o.textContent=v;$('#cfVendor').appendChild(o);});
+  TEAMS.forEach(t=>{const o=document.createElement('option');o.textContent=t;$('#cfTeam').appendChild(o);});
 }
 async function doSumLogin(){
   const roleVal=$('#sumRole').value,pw=$('#sumPw').value;
@@ -1473,11 +1502,16 @@ function renderSummary(){
 }
 function renderCumulative(){
   const hf=$('#cfHull').value,df=$('#cfDept').value;
+  const isShipTab=cumStatus==='shipped';
+  // 업체명 필터: 접수완료에만 표시
+  $('#cfVendorWrap').style.display=isShipTab?'none':'';
+  const vf=isShipTab?'':$('#cfVendor').value;
+  const tf=$('#cfTeam').value;
   // 호선 목록 동적 갱신
   const allH=[...new Set(DB.apps.filter(a=>a.status===cumStatus).map(a=>a.hull).filter(Boolean))].sort();
   $('#cfHull').innerHTML='<option value="">전체 호선</option>'+allH.map(h=>`<option value="${esc(h)}"${h===hf?' selected':''}>${esc(h)}</option>`).join('');
   // 상태 필터 적용
-  const base=DB.apps.filter(a=>a.status===cumStatus&&(!hf||a.hull===hf)&&(!df||a.dept===df));
+  const base=DB.apps.filter(a=>a.status===cumStatus&&(!hf||a.hull===hf)&&(!df||a.dept===df)&&(!vf||a.vendor===vf)&&(!tf||a.team===tf));
   const body=$('#cumBody');
   $('#cumDetail').style.display='none';
   if(!base.length){body.innerHTML=`<div class="cum-empty">해당 상태의 내역이 없습니다.</div>`;return;}
@@ -1490,7 +1524,7 @@ function renderCumulative(){
   base.forEach(a=>{if(!dateMeta[a.iso])dateMeta[a.iso]={m:a.month,d:a.day,wd:a.wd};});
   const thDates=dates.map(iso=>`<th>${dateMeta[iso].m}/${dateMeta[iso].d}<br><span style="font-weight:500;opacity:.8">(${dateMeta[iso].wd})</span></th>`).join('');
   // 접수완료: 업체별 / 배송완료: 담당자별
-  const isShip=cumStatus==='shipped';
+  const isShip=isShipTab;
   const rowKey=isShip?'handler':'vendor';
   const rowHd=isShip?'담당자':'업체명';
   const rowList=isShip
@@ -1535,6 +1569,64 @@ function renderCumulative(){
       btn.style.background='var(--c2)';btn.style.color='#fff';
     };
   });
+}
+function renderAccum(){
+  // DB에 있는 모든 주차 번호 수집 (전체 기간)
+  const allWns=[...new Set(DB.apps.map(a=>a.weekNo))].sort((a,b)=>a-b);
+  const body=$('#accumBody');
+  if(!allWns.length){body.innerHTML='<div class="cum-empty">신청 데이터가 없습니다.</div>';return;}
+  // 주차 번호 → 라벨 (ANCH/AWK 엔진 활용)
+  const wkLbl=wn=>{
+    const s=new Date(ANCH.getTime()+(wn-AWK)*7*864e5);
+    const e=new Date(s.getTime()+5*864e5);
+    return`${wn}주 (${s.getMonth()+1}/${s.getDate()} ~ ${e.getMonth()+1}/${e.getDate()})`;
+  };
+  const wkShort=wn=>{
+    const s=new Date(ANCH.getTime()+(wn-AWK)*7*864e5);
+    const e=new Date(s.getTime()+5*864e5);
+    return`${s.getMonth()+1}/${s.getDate()} ~ ${e.getMonth()+1}/${e.getDate()}`;
+  };
+  // 드롭다운 채우기 (이전 선택값 유지)
+  const fSel=$('#acWkF'),tSel=$('#acWkT');
+  const prevF=fSel.value||String(allWns[0]);
+  const prevT=tSel.value||String(allWns[allWns.length-1]);
+  fSel.innerHTML=allWns.map(wn=>`<option value="${wn}"${String(wn)===prevF?' selected':''}>${wkLbl(wn)}</option>`).join('');
+  tSel.innerHTML=allWns.map(wn=>`<option value="${wn}"${String(wn)===prevT?' selected':''}>${wkLbl(wn)}</option>`).join('');
+  const fWn=parseInt(fSel.value),tWn=parseInt(tSel.value);
+  const rangeWns=allWns.filter(wn=>wn>=fWn&&wn<=tWn);
+  if(!rangeWns.length){body.innerHTML='<div class="cum-empty">선택 범위에 데이터가 없습니다.</div>';return;}
+  let cum=0;
+  const rows=rangeWns.map(wn=>{
+    const cnt=DB.apps.filter(a=>a.weekNo===wn).length;
+    cum+=cnt;
+    return`<tr>
+      <td style="font-family:var(--mono);color:var(--c2);font-weight:700;white-space:nowrap">${wn}주</td>
+      <td style="font-size:11.5px;color:var(--mu);white-space:nowrap">${wkShort(wn)}</td>
+      <td style="text-align:center;font-weight:700">${cnt}</td>
+      <td style="text-align:center;color:var(--c2);font-weight:700;font-family:var(--mono)">${cum}</td>
+    </tr>`;
+  }).join('');
+  const grand=DB.apps.filter(a=>a.weekNo>=fWn&&a.weekNo<=tWn).length;
+  body.innerHTML=`
+    <div class="ctblwrap">
+      <table class="ctbl">
+        <thead><tr>
+          <th style="text-align:left;min-width:56px">주차</th>
+          <th style="text-align:left">기간</th>
+          <th>신청량</th>
+          <th>누적</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr class="tot-row">
+          <td class="vnm" colspan="2" style="font-weight:700">합계</td>
+          <td colspan="2" style="color:var(--c2);font-weight:700;font-size:14px;text-align:center">${grand}건</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div style="margin-top:10px;background:var(--f2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--c2);display:flex;align-items:center;gap:6px">
+      📦 조회 기간 총 누적 신청량 &nbsp;<b style="font-size:16px;font-family:var(--mono)">${grand}</b>건
+      &nbsp;<span style="font-size:11.5px;color:var(--mu)">(${rangeWns.length}주)</span>
+    </div>`;
 }
 function openCumDetail(vendor,iso,dm,items){
   const det=$('#cumDetail');
@@ -1803,9 +1895,13 @@ if('serviceWorker' in navigator){
     if(document.getElementById('sw-update-bar'))return;
     const bar=document.createElement('div');
     bar.id='sw-update-bar';
-    bar.innerHTML='🔄 새 버전으로 업데이트되었습니다. <button id="sw-reload-btn">새로고침</button>';
-    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1d4ed8;color:#fff;text-align:center;padding:11px 16px;font-size:14px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-    bar.querySelector('#sw-reload-btn').style.cssText='margin-left:12px;padding:4px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:5px;cursor:pointer;font-weight:700;font-size:13px;';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1d4ed8;color:#fff;text-align:center;padding:10px 14px 8px;font-size:14px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.25);line-height:1.8;';
+    bar.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
+      🔄 새 버전으로 업데이트되었습니다.
+      <button id="sw-reload-btn" style="padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:5px;cursor:pointer;font-weight:700;font-size:13px">새로고침</button>
+      <span style="font-size:14px;font-weight:700;color:#fde68a">← 누르세요</span>
+    </div>
+    <div style="font-size:11.5px;color:#bfdbfe;margin-top:2px">업데이트일 : 2026.10.02(금) &nbsp;·&nbsp; 개발자 : 안성민 책임</div>`;
     bar.querySelector('#sw-reload-btn').onclick=()=>location.reload();
     document.body.appendChild(bar);
   });
