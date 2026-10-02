@@ -859,6 +859,7 @@ function toRow(a){
     deck:a.deck,panel_no:a.panelNo,note:a.note||'',vendor:a.vendor,
     status:a.status,eta:a.eta||null,ship_date:a.shipDate||null,
     follow_ship:a.followShip||false,sub_material:a.subMaterial||'',
+    delay_reason:a.delayReason||'',
     created_at:a.createdAt?new Date(a.createdAt).toISOString():new Date().toISOString()};}
 function fromRow(r){
   return{id:r.id,weekNo:r.week_no,iso:r.iso,month:r.month,day:r.day,wd:r.wd,
@@ -866,6 +867,7 @@ function fromRow(r){
     deck:r.deck,panelNo:r.panel_no,note:r.note||'',vendor:r.vendor,
     status:r.status,eta:r.eta||'',shipDate:r.ship_date||'',
     followShip:r.follow_ship||false,subMaterial:r.sub_material||'',
+    delayReason:r.delay_reason||'',
     createdAt:new Date(r.created_at).getTime()};}
 /* 자재종류별 표시 필드 헬퍼 */
 function typeFields(a){
@@ -1281,7 +1283,9 @@ function openVDetail(type,day){
           <div class="rcinfo">
             ${ifHtml('소속팀',a.team)}${ifHtml('담당자',a.handler)}${ifHtml('담당과',a.dept)}
             ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
-            ${typeFields(a)}
+            ${(()=>{const isWC=a.type==='Wall'||a.type==='Ceiling';const pnL=a.type==='Ceiling'?'룸번호':a.type==='Door부자재'?'도어번호':a.type==='Panel부자재'?'룸번호':'판넬번호';const ntL=a.type==='Ceiling'?'판넬길이':(!isWC)?'신청내용(비고)':'특이사항(비고)';const subPart=(!isWC&&a.subMaterial)?ifHtml('신청부자재',a.subMaterial):'';const folPart=isWC?ifHtml('후속선반영',a.followShip?'Y':'N'):'';const notePart=a.note?`<div class="if"><div class="k">${ntL}</div><div class="v note">${esc(a.note)}</div></div>`:'';return ifHtml(pnL,a.panelNo)+subPart+folPart+notePart;})()}
+            ${ifHtml('입고예정일',a.eta)}
+            ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
           </div>
           <!-- vendor edit form -->
           <div class="editform" data-vedit="${a.id}" style="display:none;margin-top:12px">
@@ -1306,15 +1310,19 @@ function openVDetail(type,day){
             <input type="date" data-k="sd" value="${a.shipDate||''}" ${a.status!=='shipped'?'disabled':''}></div>
           <div class="fld"><label>입고 예정일</label>
             <input type="date" data-k="eta" value="${a.eta||''}" ${locked?'disabled':''}></div>
+          <div class="fld"><label>지연사유</label>
+            <input type="text" data-k="delay" value="${esc(a.delayReason||'')}" placeholder="지연 사유를 입력하세요" ${locked?'disabled':''}></div>
           ${!locked?`<button class="bed" data-vopen="${a.id}" style="width:100%">기본 정보 수정</button>`:''}
           ${locked?`<div class="alock">입고완료 처리되어 잠금됨</div>`:''}
         </div>`;
       const recv=r.querySelector('[data-k="recv"]'),ship=r.querySelector('[data-k="ship"]'),
-            sd=r.querySelector('[data-k="sd"]'),eta=r.querySelector('[data-k="eta"]');
+            sd=r.querySelector('[data-k="sd"]'),eta=r.querySelector('[data-k="eta"]'),
+            delay=r.querySelector('[data-k="delay"]');
       recv.onchange=()=>{a.status=recv.checked?'received':'applied';if(!recv.checked)a.shipDate='';render();toast(recv.checked?'접수완료':'접수해제','ok');sbUpsertApps([a]);if(recv.checked)sendNotify('UPDATE',toRow(a),{...toRow(a),status:'applied'});};
       ship.onchange=()=>{if(ship.checked){a.status='shipped';if(!a.shipDate)a.shipDate=day.iso;}else{a.status='received';a.shipDate='';}render();toast(ship.checked?'배송완료':'배송해제','ok');sbUpsertApps([a]);if(ship.checked)sendNotify('UPDATE',toRow(a),{...toRow(a),status:'received'});};
       sd.onchange=()=>{a.shipDate=sd.value;toast('배송완료일 저장','ok');sbUpsertApps([a]);};
       eta.onchange=()=>{a.eta=eta.value;toast('입고예정일 저장','ok');sbUpsertApps([a]);};
+      if(delay)delay.onchange=()=>{a.delayReason=delay.value;toast('지연사유 저장','ok');sbUpsertApps([a]);};
       r.querySelector(`[data-vopen="${a.id}"]`)?.addEventListener('click',()=>{
         r.querySelector(`[data-vedit="${a.id}"]`).style.display='';
         r.querySelector(`[data-vopen="${a.id}"]`).style.display='none';
