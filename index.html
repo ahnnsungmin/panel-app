@@ -1444,6 +1444,7 @@ function openSumDetail(vendor,type,iso,hf,df){
             ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
             ${typeFields(a)}
             ${ifHtml('배송완료일',a.shipDate)}${ifHtml('입고예정일',a.eta)}
+            ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
           </div>
         </div>
         <div class="rcact">${act}</div>`;
@@ -1535,6 +1536,7 @@ function openDeptDetail(dept,type,day){
             ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
             ${typeFields(a)}
             ${ifHtml('입고예정일',a.eta)}${ifHtml('배송완료일',a.shipDate)}
+            ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
           </div>
         </div>
         <div class="rcact">${act}</div>`;
