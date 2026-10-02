@@ -1798,6 +1798,17 @@ if('serviceWorker' in navigator){
       .then(r=>console.log('SW registered:',r.scope))
       .catch(e=>console.warn('SW failed:',e));
   });
+  // 새 버전 감지 → 새로고침 배너
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(document.getElementById('sw-update-bar'))return;
+    const bar=document.createElement('div');
+    bar.id='sw-update-bar';
+    bar.innerHTML='🔄 새 버전으로 업데이트되었습니다. <button id="sw-reload-btn">새로고침</button>';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1d4ed8;color:#fff;text-align:center;padding:11px 16px;font-size:14px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+    bar.querySelector('#sw-reload-btn').style.cssText='margin-left:12px;padding:4px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:5px;cursor:pointer;font-weight:700;font-size:13px;';
+    bar.querySelector('#sw-reload-btn').onclick=()=>location.reload();
+    document.body.appendChild(bar);
+  });
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
