@@ -562,11 +562,12 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
         데이터 내보내기
       </button>
     </div>
-    <!-- 관리자 전용 뷰 전환 -->
+    <!-- 뷰 전환 토글 (관리자: 3개, 업체/신청팀: 주차별+미처리현황) -->
     <div class="vt-bar" id="sumViewToggle" style="display:none">
       <button class="vtb on" id="btnWkView">📅 주차별</button>
       <button class="vtb" id="btnCumView">📊 누적 조회 (11주)</button>
       <button class="vtb" id="btnAccumView">📦 누적 신청량</button>
+      <button class="vtb" id="btnPendingView" style="display:none">⚠️ 미처리 현황</button>
     </div>
     <!-- 누적 조회 영역 -->
     <div id="sumCumul" style="display:none">
@@ -591,6 +592,8 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
       </div>
       <div id="cumDetail" style="display:none"></div>
     </div>
+    <!-- 미처리 현황 영역 (업체/신청팀 전용) -->
+    <div id="sumPending" style="display:none"></div>
     <!-- 누적 신청량 영역 -->
     <div id="sumAccum" style="display:none">
       <div class="card">
@@ -898,7 +901,7 @@ function buildWks(){const cur=monOf(new Date());const arr=[];
     const days=WDN.map((wd,j)=>{const dd=new Date(m);dd.setDate(dd.getDate()+j);return{wd,month:dd.getMonth()+1,day:dd.getDate(),iso:isoOf(dd)};});
     const wn=wkNo(m);arr.push({wn,label:`${wn}주 (${days[0].month}/${days[0].day} ~ ${days[5].month}/${days[5].day})`,days});}return arr;}
 const WEEKS=buildWks(),WMAP=Object.fromEntries(WEEKS.map(w=>[w.wn,w]));
-let curWk=WEEKS[0].wn,sumViewMode='week',cumStatus='received';
+let curWk=WEEKS[0].wn,sumViewMode='week',cumStatus='received',_pendingVerified=new Set();
 const cw=()=>WMAP[curWk];
 
 /* ─── STATUS ─── */
@@ -1420,13 +1423,14 @@ function initSummary(){
   $('#fDept').onchange=renderSummary;
   $('#sumPw').addEventListener('keydown',e=>{if(e.key==='Enter')doSumLogin();});
   $('#sumLogin').onclick=doSumLogin;
-  $('#sumLogout').onclick=()=>{sumSess=null;sumViewMode='week';$('#sumBoard').style.display='none';$('#sumGate').style.display='';$('#sumPw').value='';};
+  $('#sumLogout').onclick=()=>{sumSess=null;sumViewMode='week';_pendingVerified=new Set();$('#sumBoard').style.display='none';$('#sumGate').style.display='';$('#sumPw').value='';};
   // 뷰 토글 공통 초기화
-  const vtBtns=['#btnWkView','#btnCumView','#btnAccumView'];
-  const hideAll=()=>{$('#sumCumul').style.display='none';$('#sumAccum').style.display='none';$('#sumCard').style.display='none';$('#sumDetail').style.display='none';vtBtns.forEach(id=>$(id).classList.remove('on'));};
+  const vtBtns=['#btnWkView','#btnCumView','#btnAccumView','#btnPendingView'];
+  const hideAll=()=>{$('#sumCumul').style.display='none';$('#sumAccum').style.display='none';$('#sumPending').style.display='none';$('#sumCard').style.display='none';$('#sumDetail').style.display='none';vtBtns.forEach(id=>$(id).classList.remove('on'));};
   $('#btnWkView').onclick=()=>{hideAll();sumViewMode='week';$('#btnWkView').classList.add('on');$('#sumCard').style.display='';renderSummary();};
   $('#btnCumView').onclick=()=>{hideAll();sumViewMode='cumul';$('#btnCumView').classList.add('on');$('#sumCumul').style.display='';renderCumulative();};
   $('#btnAccumView').onclick=()=>{hideAll();sumViewMode='accum';$('#btnAccumView').classList.add('on');$('#sumAccum').style.display='';renderAccum();};
+  $('#btnPendingView').onclick=()=>{hideAll();sumViewMode='pending';$('#btnPendingView').classList.add('on');$('#sumPending').style.display='';renderPending();};
   // 누적 상태 탭
   $('#ctRecv').onclick=()=>{cumStatus='received';$('#ctRecv').classList.add('on');$('#ctShip').classList.remove('on');renderCumulative();};
   $('#ctShip').onclick=()=>{cumStatus='shipped';$('#ctShip').classList.add('on');$('#ctRecv').classList.remove('on');renderCumulative();};
@@ -1462,8 +1466,13 @@ function renderSummary(){
   $('#sumRoleLbl').textContent=roleMap[sumSess.type]+(sumSess.type==='admin'?' · 전체 조회':' · 본인 데이터');
   // 담당과 필터는 dept 권한이면 숨김 (이미 필터됨)
   $('#fDeptWrap').style.display=sumSess.type==='dept'?'none':'';
-  // 관리자 전용 토글 표시
-  $('#sumViewToggle').style.display=sumSess.type==='admin'?'':'none';
+  // 역할별 토글 표시
+  const _isAdmin=sumSess.type==='admin';
+  const _hasRole=sumSess.type==='vendor'||sumSess.type==='team';
+  $('#sumViewToggle').style.display=(_isAdmin||_hasRole)?'':'none';
+  $('#btnCumView').style.display=_isAdmin?'':'none';
+  $('#btnAccumView').style.display=_isAdmin?'':'none';
+  $('#btnPendingView').style.display=_hasRole?'':'none';
   $('#sumTtl').textContent=cw().label+' 신청 집계표';
   const hSel=$('#fHull'),pH=hSel.value;
   const wkA=sumFilterApps(DB.apps.filter(a=>a.weekNo===curWk));
@@ -1627,6 +1636,106 @@ function renderAccum(){
       📦 조회 기간 총 누적 신청량 &nbsp;<b style="font-size:16px;font-family:var(--mono)">${grand}</b>건
       &nbsp;<span style="font-size:11.5px;color:var(--mu)">(${rangeWns.length}주)</span>
     </div>`;
+}
+function renderPending(){
+  const wrap=$('#sumPending');
+  wrap.innerHTML='';
+  const s=sumSess;
+  if(!s||!(s.type==='vendor'||s.type==='team'))return;
+  const isVendor=s.type==='vendor';
+  const items=isVendor
+    ?DB.apps.filter(a=>a.vendor===s.name&&a.status==='received').sort((a,b)=>a.iso<b.iso?-1:1)
+    :DB.apps.filter(a=>a.team===s.name&&a.status==='shipped').sort((a,b)=>a.iso<b.iso?-1:1);
+  const cardTitle=isVendor?'미배송 접수 건 (전체 기간)':'입고 미완료 건 (전체 기간)';
+  const card=el('div','card');
+  card.innerHTML=`<div class="ct"><span class="tg" style="background:#d97706;color:#fff">미처리</span>${cardTitle}
+    <span style="font-size:13px;color:var(--mu);margin-left:6px">${items.length}건</span></div>`;
+  if(!items.length){
+    const empty=el('div','cum-empty');empty.style.color='var(--tst)';empty.textContent='✓ 미처리 건이 없습니다';
+    card.appendChild(empty);wrap.appendChild(card);return;
+  }
+  items.forEach(a=>{
+    const dateStr=a.iso?a.iso.slice(5).replace('-','/'):'';
+    const wkBadge=`<span style="font-size:11.5px;color:var(--mu);margin-left:4px">${a.weekNo}주 · ${dateStr}</span>`;
+    const r=el('div','rc');
+    if(isVendor){
+      r.innerHTML=`
+        <div>
+          <div style="margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${stPill(a.status)}${wkBadge}</div>
+          <div class="rcinfo">
+            ${ifHtml('소속팀',a.team)}${ifHtml('담당자',a.handler)}${ifHtml('담당과',a.dept)}
+            ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
+            ${typeFields(a)}
+            ${ifHtml('입고예정일',a.eta)}
+            ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
+          </div>
+        </div>
+        <div class="rcact">
+          <div class="trow"><span class="tl">배송 완료</span>
+            <label class="sw gd"><input type="checkbox" data-k="ship">
+            <span class="tr"><span class="y">Y</span><span class="n">N</span></span><span class="kn"></span></label></div>
+          <div class="fld"><label>배송 완료일</label>
+            <input type="date" data-k="sd" value="${a.shipDate||''}" disabled></div>
+          <div class="fld"><label>입고 예정일</label>
+            <input type="date" data-k="eta" value="${a.eta||''}"></div>
+          <div class="fld"><label>지연사유</label>
+            <input type="text" data-k="delay" value="${esc(a.delayReason||'')}" placeholder="지연 사유를 입력하세요"></div>
+        </div>`;
+      const ship=r.querySelector('[data-k="ship"]'),sd=r.querySelector('[data-k="sd"]'),
+            eta=r.querySelector('[data-k="eta"]'),delay=r.querySelector('[data-k="delay"]');
+      ship.onchange=()=>{
+        if(ship.checked){a.status='shipped';if(!a.shipDate)a.shipDate=new Date().toISOString().slice(0,10);}
+        else{a.status='received';a.shipDate='';}
+        renderPending();toast(ship.checked?'배송완료':'배송해제','ok');sbUpsertApps([a]);
+        if(ship.checked)sendNotify('UPDATE',toRow(a),{...toRow(a),status:'received'});
+      };
+      sd.onchange=()=>{a.shipDate=sd.value;toast('배송완료일 저장','ok');sbUpsertApps([a]);};
+      eta.onchange=()=>{a.eta=eta.value;toast('입고예정일 저장','ok');sbUpsertApps([a]);};
+      delay.onchange=()=>{a.delayReason=delay.value;toast('지연사유 저장','ok');sbUpsertApps([a]);};
+    } else {
+      r.innerHTML=`
+        <div>
+          <div style="margin-bottom:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${stPill(a.status)}${wkBadge}</div>
+          <div class="rcinfo">
+            ${ifHtml('소속팀',a.team)}${ifHtml('담당자',a.handler)}${ifHtml('담당과',a.dept)}
+            ${ifHtml('호선',a.hull)}${ifHtml('데크',a.deck)}
+            ${typeFields(a)}
+            ${ifHtml('배송완료일',a.shipDate)}${ifHtml('입고예정일',a.eta)}
+            ${a.delayReason?`<div class="if"><div class="k">지연사유</div><div class="v note">${esc(a.delayReason)}</div></div>`:''}
+          </div>
+        </div>
+        <div class="rcact">
+          <button class="bstock" data-so>입고 완료 처리</button>
+          <div class="cs" data-csbox style="display:none">
+            <div style="font-size:11.5px;color:var(--tsh);font-weight:600">${esc(a.team)} 접속 비밀번호</div>
+            <div class="csrow"><input type="password" data-cpw placeholder="소속팀 비밀번호" autocomplete="off"><button class="cgo" data-cgo>확인</button></div>
+          </div>
+        </div>`;
+      const ob=r.querySelector('[data-so]'),cb=r.querySelector('[data-csbox]');
+      const doSt=async()=>{
+        const pw=cb.querySelector('[data-cpw]').value;
+        const btn=cb.querySelector('[data-cgo]');btn.disabled=true;
+        const ok=await verifyPw('team',a.team,pw);
+        btn.disabled=false;
+        if(!ok){toast('소속팀 비밀번호가 일치하지 않습니다','err');return;}
+        _pendingVerified.add(a.team);a.status='stocked';renderPending();
+        toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);
+        sendNotify('UPDATE',toRow(a),{...toRow(a),status:'shipped'});
+      };
+      ob.onclick=()=>{
+        if(_pendingVerified.has(a.team)){
+          a.status='stocked';renderPending();
+          toast('입고완료 처리되었습니다','ok');sbUpsertApps([a]);
+          sendNotify('UPDATE',toRow(a),{...toRow(a),status:'shipped'});return;
+        }
+        cb.style.display='';cb.querySelector('[data-cpw]').focus();
+      };
+      cb.querySelector('[data-cgo]').onclick=doSt;
+      cb.querySelector('[data-cpw]').addEventListener('keydown',e=>{if(e.key==='Enter')doSt();});
+    }
+    card.appendChild(r);
+  });
+  wrap.appendChild(card);
 }
 function openCumDetail(vendor,iso,dm,items){
   const det=$('#cumDetail');
