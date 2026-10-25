@@ -77,6 +77,8 @@ input,select,textarea{font-family:inherit}
 .ctrl:focus{border-color:var(--c2);box-shadow:0 0 0 3px rgba(0,48,135,.12)}
 .ctrl::placeholder{color:#9aaabb}
 select.ctrl{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%235a7090' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:28px}
+select.reason-sel:invalid,select.reason-sel[value=""]{border-color:var(--ln)}
+select.reason-sel:not(:invalid):not([value=""]){border-color:#16a34a}
 textarea.ctrl{resize:vertical;min-height:80px;line-height:1.5}
 .fr2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
@@ -565,19 +567,24 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
     <!-- 뷰 전환 토글 (관리자: 3개, 업체/신청팀: 주차별+미처리현황) -->
     <div class="vt-bar" id="sumViewToggle" style="display:none">
       <button class="vtb on" id="btnWkView">📅 주차별</button>
-      <button class="vtb" id="btnCumView">📊 누적 조회 (11주)</button>
+      <button class="vtb" id="btnCumView">📊 누적 조회</button>
       <button class="vtb" id="btnAccumView">📦 누적 신청량</button>
+      <button class="vtb" id="btnReasonView" style="display:none">📋 신청사유 분석</button>
       <button class="vtb" id="btnPendingView" style="display:none">⚠️ 미처리 현황</button>
     </div>
     <!-- 누적 조회 영역 -->
     <div id="sumCumul" style="display:none">
       <div class="card">
-        <div class="ct"><span class="tg">누적</span>11주 누적 현황 · 날짜별</div>
+        <div class="ct"><span class="tg">누적</span>누적 현황 · 날짜별</div>
         <div class="cum-tabs">
           <button class="ctab on recv" id="ctRecv">접수완료</button>
           <button class="ctab ship" id="ctShip">배송완료</button>
         </div>
         <div class="fbar">
+          <div class="field"><label>시작 주차</label>
+            <select class="ctrl" id="cfWkF"><option value="">전체 (처음부터)</option></select></div>
+          <div class="field"><label>종료 주차</label>
+            <select class="ctrl" id="cfWkT"><option value="">전체 (현재까지)</option></select></div>
           <div class="field"><label>호선 필터</label>
             <select class="ctrl" id="cfHull"><option value="">전체 호선</option></select></div>
           <div class="field"><label>담당과 필터</label>
@@ -591,6 +598,19 @@ table.st .tot td{background:#edf2fa;font-weight:700;color:var(--c2);font-family:
         <div id="cumBody"></div>
       </div>
       <div id="cumDetail" style="display:none"></div>
+    </div>
+    <!-- 신청사유 분석 영역 (관리자 전용) -->
+    <div id="sumReason" style="display:none">
+      <div class="card">
+        <div class="ct"><span class="tg" style="background:var(--c2)">사유</span>신청사유 분석 · 주차별</div>
+        <div class="fbar">
+          <div class="field"><label>시작 주차</label>
+            <select class="ctrl" id="rfWkF"><option value="">전체 (처음부터)</option></select></div>
+          <div class="field"><label>종료 주차</label>
+            <select class="ctrl" id="rfWkT"><option value="">전체 (현재까지)</option></select></div>
+        </div>
+        <div id="reasonBody"></div>
+      </div>
     </div>
     <!-- 미처리 현황 영역 (업체/신청팀 전용) -->
     <div id="sumPending" style="display:none"></div>
@@ -933,7 +953,7 @@ function toRow(a){
     deck:a.deck,panel_no:a.panelNo,note:a.note||'',vendor:a.vendor,
     status:a.status,eta:a.eta||null,ship_date:a.shipDate||null,
     follow_ship:a.followShip||false,sub_material:a.subMaterial||'',
-    delay_reason:a.delayReason||'',
+    delay_reason:a.delayReason||'',reason:a.reason||'',
     created_at:a.createdAt?new Date(a.createdAt).toISOString():new Date().toISOString()};}
 function fromRow(r){
   return{id:r.id,weekNo:r.week_no,iso:r.iso,month:r.month,day:r.day,wd:r.wd,
@@ -941,7 +961,7 @@ function fromRow(r){
     deck:r.deck,panelNo:r.panel_no,note:r.note||'',vendor:r.vendor,
     status:r.status,eta:r.eta||'',shipDate:r.ship_date||'',
     followShip:r.follow_ship||false,subMaterial:r.sub_material||'',
-    delayReason:r.delay_reason||'',
+    delayReason:r.delay_reason||'',reason:r.reason||'',
     createdAt:new Date(r.created_at).getTime()};}
 /* 자재종류별 표시 필드 헬퍼 */
 function typeFields(a){
@@ -1084,6 +1104,7 @@ function rowTpl(){
       <input class="ctrl" data-f="panelNo" placeholder="${col5Ph}" autocomplete="off">
       <input class="ctrl" data-f="note" placeholder="${isCeil?'판넬길이':'특이사항(비고)'}" autocomplete="off">
       <div class="row-fol"><label class="rfol"><input type="checkbox" data-f="followShip"><span class="rt"></span><span class="rk"></span></label><span class="fl">후속선</span></div>
+      <select class="ctrl reason-sel" data-f="reason" required><option value="">신청사유 선택</option><option>설계 오작</option><option>메이커 오작</option><option>현장 데미지</option><option>기타</option></select>
       <select class="ctrl" data-f="vendor"><option value="">업체 선택</option>${vOpts}</select>
       <div class="racts"><button class="rdel" title="삭제">×</button></div>`;
   }else{
@@ -1094,6 +1115,7 @@ function rowTpl(){
       <input class="ctrl" data-f="panelNo" placeholder="${col5Ph}" autocomplete="off">
       <input class="ctrl" data-f="subMaterial" placeholder="신청 부자재" autocomplete="off">
       <input class="ctrl" data-f="note" placeholder="신청 내용(비고)" autocomplete="off">
+      <select class="ctrl reason-sel" data-f="reason" required><option value="">신청사유 선택</option><option>설계 오작</option><option>메이커 오작</option><option>현장 데미지</option><option>기타</option></select>
       <select class="ctrl" data-f="vendor"><option value="">업체 선택</option>${vOpts}</select>
       <div class="racts"><button class="rdel" title="삭제">×</button></div>`;
   }
@@ -1140,7 +1162,7 @@ function initApply(){
       const g=f=>ln.querySelector(`[data-f="${f}"]`)?.value?.trim()||'';
       const gs=f=>ln.querySelector(`[data-f="${f}"]`)?.value||'';
       const hull=g('hull'),dept=gs('dept'),deck=g('deck'),panelNo=g('panelNo'),
-            note=g('note'),vendor=gs('vendor');
+            note=g('note'),vendor=gs('vendor'),reason=gs('reason');
       const followShip=ln.querySelector('[data-f="followShip"]')?.checked||false;
       const subMaterial=g('subMaterial');
       if(!hull&&!dept&&!deck&&!panelNo&&!note&&!vendor&&!subMaterial)continue;
@@ -1148,7 +1170,8 @@ function initApply(){
       const needSub=!isWCType&&!subMaterial;
       if(!hull||!dept||!deck||!panelNo||!vendor||needSub){
         toast(`호선·담당과·데크·${pnLbl}·${needSub?'신청부자재·':''}업체명을 모두 입력하세요`,'err');return;}
-      items.push({hull,dept,deck,panelNo,note,vendor,followShip,subMaterial});
+      if(!reason){toast('신청사유를 선택하세요','err');return;}
+      items.push({hull,dept,deck,panelNo,note,vendor,followShip,subMaterial,reason});
     }
     if(!items.length){toast('신청 항목을 1개 이상 입력하세요','err');return;}
     const btn=$('#apSubmit');btn.disabled=true;
@@ -1288,7 +1311,7 @@ function initHandlerModal(){
     const newApps=items.map(it=>({id:uid(),weekNo:curWk,iso,month:day.month,day:day.day,wd:day.wd,
       team,handler,type,hull:it.hull,dept:it.dept,deck:it.deck,panelNo:it.panelNo,note:it.note,
       vendor:it.vendor,followShip:it.followShip||false,subMaterial:it.subMaterial||'',
-      status:'applied',eta:'',shipDate:'',createdAt:Date.now()}));
+      reason:it.reason||'',status:'applied',eta:'',shipDate:'',createdAt:Date.now()}));
     newApps.forEach(a=>DB.apps.push(a));
     $('#hMod').style.display='none';_pending=null;
     sbUpsertApps(newApps);
@@ -1425,16 +1448,19 @@ function initSummary(){
   $('#sumLogin').onclick=doSumLogin;
   $('#sumLogout').onclick=()=>{sumSess=null;sumViewMode='week';_pendingVerified=new Set();$('#sumBoard').style.display='none';$('#sumGate').style.display='';$('#sumPw').value='';};
   // 뷰 토글 공통 초기화
-  const vtBtns=['#btnWkView','#btnCumView','#btnAccumView','#btnPendingView'];
-  const hideAll=()=>{$('#sumCumul').style.display='none';$('#sumAccum').style.display='none';$('#sumPending').style.display='none';$('#sumCard').style.display='none';$('#sumDetail').style.display='none';vtBtns.forEach(id=>$(id).classList.remove('on'));};
+  const vtBtns=['#btnWkView','#btnCumView','#btnAccumView','#btnReasonView','#btnPendingView'];
+  const hideAll=()=>{$('#sumCumul').style.display='none';$('#sumAccum').style.display='none';$('#sumPending').style.display='none';$('#sumReason').style.display='none';$('#sumCard').style.display='none';$('#sumDetail').style.display='none';vtBtns.forEach(id=>$(id).classList.remove('on'));};
   $('#btnWkView').onclick=()=>{hideAll();sumViewMode='week';$('#btnWkView').classList.add('on');$('#sumCard').style.display='';renderSummary();};
   $('#btnCumView').onclick=()=>{hideAll();sumViewMode='cumul';$('#btnCumView').classList.add('on');$('#sumCumul').style.display='';renderCumulative();};
   $('#btnAccumView').onclick=()=>{hideAll();sumViewMode='accum';$('#btnAccumView').classList.add('on');$('#sumAccum').style.display='';renderAccum();};
+  $('#btnReasonView').onclick=()=>{hideAll();sumViewMode='reason';$('#btnReasonView').classList.add('on');$('#sumReason').style.display='';renderReason();};
   $('#btnPendingView').onclick=()=>{hideAll();sumViewMode='pending';$('#btnPendingView').classList.add('on');$('#sumPending').style.display='';renderPending();};
   // 누적 상태 탭
   $('#ctRecv').onclick=()=>{cumStatus='received';$('#ctRecv').classList.add('on');$('#ctShip').classList.remove('on');renderCumulative();};
   $('#ctShip').onclick=()=>{cumStatus='shipped';$('#ctShip').classList.add('on');$('#ctRecv').classList.remove('on');renderCumulative();};
-  // 누적 조회 필터
+  // 누적 조회 필터 (주차 범위 포함)
+  $('#cfWkF').onchange=renderCumulative;
+  $('#cfWkT').onchange=renderCumulative;
   $('#cfHull').onchange=renderCumulative;
   $('#cfDept').onchange=renderCumulative;
   $('#cfVendor').onchange=renderCumulative;
@@ -1442,6 +1468,9 @@ function initSummary(){
   // 누적 신청량 필터
   $('#acWkF').onchange=renderAccum;
   $('#acWkT').onchange=renderAccum;
+  // 신청사유 분석 필터
+  $('#rfWkF').onchange=renderReason;
+  $('#rfWkT').onchange=renderReason;
   // 업체명·소속팀 셀렉트 초기화
   VENDORS.forEach(v=>{const o=document.createElement('option');o.textContent=v;$('#cfVendor').appendChild(o);});
   TEAMS.forEach(t=>{const o=document.createElement('option');o.textContent=t;$('#cfTeam').appendChild(o);});
@@ -1472,6 +1501,7 @@ function renderSummary(){
   $('#sumViewToggle').style.display=(_isAdmin||_hasRole)?'':'none';
   $('#btnCumView').style.display=_isAdmin?'':'none';
   $('#btnAccumView').style.display=_isAdmin?'':'none';
+  $('#btnReasonView').style.display=_isAdmin?'':'none';
   $('#btnPendingView').style.display=_hasRole?'':'none';
   $('#sumTtl').textContent=cw().label+' 신청 집계표';
   const hSel=$('#fHull'),pH=hSel.value;
@@ -1510,8 +1540,17 @@ function renderSummary(){
   body.querySelectorAll('.cb').forEach(b=>b.onclick=()=>openSumDetail(b.dataset.v,b.dataset.pt,b.dataset.iso,b.dataset.hf,b.dataset.df));
 }
 function renderCumulative(){
-  const hf=$('#cfHull').value,df=$('#cfDept').value;
   const isShipTab=cumStatus==='shipped';
+  // 주차 범위 셀렉트 동적 갱신
+  const allWns=[...new Set(DB.apps.filter(a=>a.status===cumStatus).map(a=>a.weekNo))].sort((a,b)=>a-b);
+  const wkLblShort=wn=>{const s=new Date(ANCH.getTime()+(wn-AWK)*7*864e5);const e=new Date(s.getTime()+5*864e5);return`${wn}주 (${s.getMonth()+1}/${s.getDate()}~${e.getMonth()+1}/${e.getDate()})`;};
+  const fSel=$('#cfWkF'),tSel=$('#cfWkT');
+  const prevCfF=fSel.value,prevCfT=tSel.value;
+  fSel.innerHTML='<option value="">전체 (처음부터)</option>'+allWns.map(wn=>`<option value="${wn}"${String(wn)===prevCfF?' selected':''}>${wkLblShort(wn)}</option>`).join('');
+  tSel.innerHTML='<option value="">전체 (현재까지)</option>'+allWns.map(wn=>`<option value="${wn}"${String(wn)===prevCfT?' selected':''}>${wkLblShort(wn)}</option>`).join('');
+  const cfWkFv=fSel.value?parseInt(fSel.value):null;
+  const cfWkTv=tSel.value?parseInt(tSel.value):null;
+  const hf=$('#cfHull').value,df=$('#cfDept').value;
   // 업체명 필터: 접수완료에만 표시
   $('#cfVendorWrap').style.display=isShipTab?'none':'';
   const vf=isShipTab?'':$('#cfVendor').value;
@@ -1519,8 +1558,10 @@ function renderCumulative(){
   // 호선 목록 동적 갱신
   const allH=[...new Set(DB.apps.filter(a=>a.status===cumStatus).map(a=>a.hull).filter(Boolean))].sort();
   $('#cfHull').innerHTML='<option value="">전체 호선</option>'+allH.map(h=>`<option value="${esc(h)}"${h===hf?' selected':''}>${esc(h)}</option>`).join('');
-  // 상태 필터 적용
-  const base=DB.apps.filter(a=>a.status===cumStatus&&(!hf||a.hull===hf)&&(!df||a.dept===df)&&(!vf||a.vendor===vf)&&(!tf||a.team===tf));
+  // 상태 + 주차 범위 필터 적용
+  const base=DB.apps.filter(a=>a.status===cumStatus
+    &&(!cfWkFv||a.weekNo>=cfWkFv)&&(!cfWkTv||a.weekNo<=cfWkTv)
+    &&(!hf||a.hull===hf)&&(!df||a.dept===df)&&(!vf||a.vendor===vf)&&(!tf||a.team===tf));
   const body=$('#cumBody');
   $('#cumDetail').style.display='none';
   if(!base.length){body.innerHTML=`<div class="cum-empty">해당 상태의 내역이 없습니다.</div>`;return;}
@@ -1635,6 +1676,61 @@ function renderAccum(){
     <div style="margin-top:10px;background:var(--f2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--c2);display:flex;align-items:center;gap:6px">
       📦 조회 기간 총 누적 신청량 &nbsp;<b style="font-size:16px;font-family:var(--mono)">${grand}</b>건
       &nbsp;<span style="font-size:11.5px;color:var(--mu)">(${rangeWns.length}주)</span>
+    </div>`;
+}
+function renderReason(){
+  const REASONS=['설계 오작','메이커 오작','현장 데미지','기타'];
+  const body=$('#reasonBody');
+  // 전체 주차 목록 (reason 있는 신청건 기준)
+  const allWns=[...new Set(DB.apps.map(a=>a.weekNo))].sort((a,b)=>a-b);
+  const wkLbl=wn=>{const s=new Date(ANCH.getTime()+(wn-AWK)*7*864e5);const e=new Date(s.getTime()+5*864e5);return`${wn}주 (${s.getMonth()+1}/${s.getDate()}~${e.getMonth()+1}/${e.getDate()})`;};
+  const fSel=$('#rfWkF'),tSel=$('#rfWkT');
+  const prevF=fSel.value,prevT=tSel.value;
+  fSel.innerHTML='<option value="">전체 (처음부터)</option>'+allWns.map(wn=>`<option value="${wn}"${String(wn)===prevF?' selected':''}>${wkLbl(wn)}</option>`).join('');
+  tSel.innerHTML='<option value="">전체 (현재까지)</option>'+allWns.map(wn=>`<option value="${wn}"${String(wn)===prevT?' selected':''}>${wkLbl(wn)}</option>`).join('');
+  const rfF=fSel.value?parseInt(fSel.value):null;
+  const rfT=tSel.value?parseInt(tSel.value):null;
+  const filtered=DB.apps.filter(a=>(!rfF||a.weekNo>=rfF)&&(!rfT||a.weekNo<=rfT));
+  const wns=[...new Set(filtered.map(a=>a.weekNo))].sort((a,b)=>a-b);
+  if(!wns.length){body.innerHTML='<div class="cum-empty">해당 기간의 신청 데이터가 없습니다.</div>';return;}
+  // 컬럼 합계
+  const colTot=REASONS.map(r=>0);
+  let grandTot=0;
+  const rows=wns.map(wn=>{
+    const wkApps=filtered.filter(a=>a.weekNo===wn);
+    const counts=REASONS.map(r=>wkApps.filter(a=>a.reason===r).length);
+    const rowTot=counts.reduce((s,n)=>s+n,0);
+    counts.forEach((n,i)=>{colTot[i]+=n;});
+    grandTot+=rowTot;
+    const cells=counts.map(n=>n?`<td style="text-align:center;font-weight:700;color:var(--c2)">${n}</td>`:`<td class="z" style="text-align:center">·</td>`).join('');
+    return`<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--c2);white-space:nowrap">${wn}주</td>
+      <td style="font-size:11px;color:var(--mu);white-space:nowrap">${(s=>s.getMonth()+1+'/'+s.getDate())(new Date(ANCH.getTime()+(wn-AWK)*7*864e5))} ~ ${(e=>e.getMonth()+1+'/'+e.getDate())(new Date(ANCH.getTime()+(wn-AWK)*7*864e5+5*864e5))}</td>
+      ${cells}
+      <td style="text-align:center;font-weight:700">${rowTot}</td>
+    </tr>`;
+  }).join('');
+  const totCells=colTot.map(n=>n?`<td style="text-align:center;font-weight:700;color:var(--c2)">${n}</td>`:`<td class="z" style="text-align:center">·</td>`).join('');
+  body.innerHTML=`
+    <div class="ctblwrap">
+      <table class="ctbl">
+        <thead><tr>
+          <th style="text-align:left;min-width:52px">주차</th>
+          <th style="text-align:left;font-size:11px">기간</th>
+          ${REASONS.map(r=>`<th style="text-align:center;white-space:nowrap">${r}</th>`).join('')}
+          <th style="text-align:center">합계</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr class="tot-row">
+          <td class="vnm" colspan="2" style="font-weight:700">누계</td>
+          ${totCells}
+          <td style="text-align:center;font-weight:700;color:var(--c2)">${grandTot}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div style="margin-top:10px;background:var(--f2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--c2);display:flex;align-items:center;gap:6px">
+      📋 조회 기간 신청사유 총 누계 &nbsp;<b style="font-size:16px;font-family:var(--mono)">${grandTot}</b>건
+      &nbsp;<span style="font-size:11.5px;color:var(--mu)">(${wns.length}주)</span>
     </div>`;
 }
 function renderPending(){
@@ -1993,7 +2089,7 @@ function onWkChange(){
 }
 
 // ── 앱 버전 & 업데이트 배너 ──────────────────────────────────────────────────
-const _APP_VER='20261003';
+const _APP_VER='20261025';
 
 function _showBanner(){
   if(document.getElementById('sw-update-bar'))return;
